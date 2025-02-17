@@ -108,6 +108,7 @@ pacman_EXTERNAL_OBJECTS =
 pacman: CMakeFiles/pacman.dir/src/main.c.o
 pacman: CMakeFiles/pacman.dir/src/z80.c.o
 pacman: CMakeFiles/pacman.dir/build.make
+pacman: /usr/local/lib/libSDL3.so.0.2.4
 pacman: CMakeFiles/pacman.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/zcarp/Documents/pac-man/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Linking C executable pacman"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/pacman.dir/link.txt --verbose=$(VERBOSE)

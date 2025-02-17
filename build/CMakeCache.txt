@@ -186,6 +186,12 @@ CMAKE_STRIP:FILEPATH=/usr/bin/strip
 // Studio IDE projects all commands are done without /nologo.
 CMAKE_VERBOSE_MAKEFILE:BOOL=FALSE
 
+//Use vendored libraries
+PACMAN_VENDORED:BOOL=OFF
+
+//The directory containing a CMake configuration file for SDL3.
+SDL3_DIR:PATH=/usr/local/lib/cmake/SDL3
+
 //Value Computed by CMake
 pacman_BINARY_DIR:STATIC=/home/zcarp/Documents/pac-man/build
 

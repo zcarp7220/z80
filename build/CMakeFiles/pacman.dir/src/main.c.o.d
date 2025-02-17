@@ -61,4 +61,24 @@ CMakeFiles/pacman.dir/src/main.c.o: \
  /usr/local/include/SDL3/SDL_scancode.h \
  /usr/local/include/SDL3/SDL_video.h /usr/local/include/SDL3/SDL_mouse.h \
  /usr/local/include/SDL3/SDL_pen.h /usr/local/include/SDL3/SDL_touch.h \
- /usr/local/include/SDL3/SDL_init.h
+ /usr/local/include/SDL3/SDL_init.h /usr/local/include/SDL3/SDL.h \
+ /usr/local/include/SDL3/SDL_assert.h \
+ /usr/local/include/SDL3/SDL_asyncio.h /usr/local/include/SDL3/SDL_bits.h \
+ /usr/local/include/SDL3/SDL_clipboard.h \
+ /usr/local/include/SDL3/SDL_cpuinfo.h \
+ /usr/local/include/SDL3/SDL_dialog.h \
+ /usr/local/include/SDL3/SDL_filesystem.h \
+ /usr/local/include/SDL3/SDL_gpu.h /usr/local/include/SDL3/SDL_haptic.h \
+ /usr/local/include/SDL3/SDL_hidapi.h /usr/local/include/SDL3/SDL_hints.h \
+ /usr/local/include/SDL3/SDL_loadso.h \
+ /usr/local/include/SDL3/SDL_locale.h /usr/local/include/SDL3/SDL_log.h \
+ /usr/local/include/SDL3/SDL_messagebox.h \
+ /usr/local/include/SDL3/SDL_metal.h /usr/local/include/SDL3/SDL_misc.h \
+ /usr/local/include/SDL3/SDL_platform.h \
+ /usr/local/include/SDL3/SDL_process.h \
+ /usr/local/include/SDL3/SDL_render.h \
+ /usr/local/include/SDL3/SDL_storage.h \
+ /usr/local/include/SDL3/SDL_system.h /usr/local/include/SDL3/SDL_time.h \
+ /usr/local/include/SDL3/SDL_timer.h /usr/local/include/SDL3/SDL_tray.h \
+ /usr/local/include/SDL3/SDL_version.h \
+ /usr/local/include/SDL3/SDL_oldnames.h
