@@ -1,3 +1,0 @@
-/home/zcarp/Documents/pac-man/build/CMakeFiles/pacman.dir
-/home/zcarp/Documents/pac-man/build/CMakeFiles/edit_cache.dir
-/home/zcarp/Documents/pac-man/build/CMakeFiles/rebuild_cache.dir
