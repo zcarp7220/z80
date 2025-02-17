@@ -1,0 +1,1 @@
+/usr/bin/cc CMakeFiles/pacman.dir/src/main.c.o CMakeFiles/pacman.dir/src/z80.c.o -o pacman 
