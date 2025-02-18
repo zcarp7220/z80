@@ -1,6 +1,5 @@
 #include "common.h"
-void step(int opcode);
-void LD(int a, int b);
+void step(u_int8_t opcode[3]);
 bool halt;
 struct cpu{
 u_int8_t A;
@@ -18,5 +17,6 @@ u_int16_t PC;
 u_int16_t SP;
 u_int16_t IX;
 u_int16_t IY;
+u_int16_t AF;
 u_int8_t R;
 };
