@@ -1,5 +1,6 @@
 #include "common.h"
-void step(uint8_t opcode[3]);
+
+void step();
 struct cpu{
 
 bool halt;
@@ -17,4 +18,6 @@ union{struct{uint8_t Hp; uint8_t Lp;};uint16_t HLp; };
 uint16_t PC; uint16_t SP; uint16_t IX; 
 uint16_t IY; uint16_t I; uint16_t R;
 
-};
+}z80;
+void runOpcode(struct cpu * z80);
+
