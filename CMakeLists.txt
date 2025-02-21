@@ -8,4 +8,7 @@ src/common.h
 src/main.c
 src/opcodes.c
 )
-target_compile_options(z80 PRIVATE -Wall -Wextra -Wpedantic)
+find_package(json-c CONFIG)
+target_link_libraries(${PROJECT_NAME} PRIVATE json-c::json-c)
+
+target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic)

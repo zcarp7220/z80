@@ -1,35 +1,52 @@
 #include "common.h"
 #include "z80.h"
-#define LD(A, B) (*(B) = *(A))
-#define LDnn(A, B) (*(B) = A)
+#define LD(A, B) (B = *(A))
+#define LDn(B, A) (B = A)
 #define ADD(A, B) (*(B) = *(B) + *(A))
 void setFlag(cpu_t *z80, int flag) { z80->F |= 1 << flag; }
 void clearFlag(cpu_t *z80, int flag) { z80->F &= ~(1 << flag); }
 bool readFlag(cpu_t *z80, int flag) { return z80->F & flag; }
-static inline uint16_t nn(struct cpu *z80) {
-  return z80->PC + 1 | (z80->PC + 2) << 8;
+static inline uint16_t nn(cpu_t *z80) {
+  return (z80->PC + 1) | (z80->PC + 2) << 8;
 }
-static inline uint16_t n(struct cpu *z80) { return z80->PC + 1; }
-
+static inline uint16_t n(cpu_t *z80) { return z80->PC + 1; }
+inline int readMem(uint16_t addr) {
+  if (addr == 0x0 && addr <= 0x99) {
+    return ram[addr];
+  } else if (addr >= 0x100 && addr <= 0x2300) {
+    return zexall[addr - 0x100];
+  } else if (addr >= 0x2301 && 0xFFFF) {
+    return ram[addr - 0x2301];
+  }
+}
+inline void writeMem(uint8_t data, uint16_t addr) {
+  if (addr == 0x0 && addr <= 0x99) {
+    ram[addr] = data;
+  } else if (addr >= 0x100 && addr <= 0x2300) {
+    zexall[addr - 0x100] = data;
+  } else if (addr >= 0x2301 && 0xFFFF) {
+    ram[addr - 0x2301] = data;
+  }
+}
 void runOpcode(cpu_t *z80) {
-  switch (readMem(*z80->PC)) {
+  switch (readMem(z80->PC)) {
   case 0xCB:
-    switch (readMem(*z80->PC + 1)) {}
+    switch (readMem(z80->PC + 1)) {}
   case 0xED:
-    switch (readMem(*z80->PC + 1)) {}
+    switch (readMem(z80->PC + 1)) {}
   case 0xDD:
-    switch (readMem(*z80->PC + 1)) {}
+    switch (readMem(z80->PC + 1)) {}
   case 0xFD:
-    switch (readMem(*z80->PC + 1)) {}
+    switch (readMem(z80->PC + 1)) {}
   case 0x0:
     z80->PC += 1;
     break;
   case 0x1:
-    LDnn(z80->BC, nn(&z80));
+    LDn(z80->BC, nn(z80));
     z80->PC += 3;
     break;
   case 0x2:
-    readMem(BC) = z80->A;
+    writeMem(z80->A, readMem(z80->BC));
     z80->PC += 1;
     break;
   case 0x3:
@@ -45,12 +62,12 @@ void runOpcode(cpu_t *z80) {
     z80->PC += 1;
     break;
   case 0x6:
-    LD(B, n(&z80));
+    LDn(z80->B, n(z80));
     z80->PC += 2;
     break;
   case 0x7:
     if (z80->A & 0x80) {
-      setFlag(Z80_CF);
+      setFlag(z80, Z80_CF);
     }
     z80->A <<= 1;
     z80->PC += 1;
@@ -443,8 +460,6 @@ void runOpcode(cpu_t *z80) {
     break;
   case 0xCA:
     break;
-  case 0xCB:
-    break;
   case 0xCC:
     break;
   case 0xCD:
@@ -479,8 +494,7 @@ void runOpcode(cpu_t *z80) {
     break;
   case 0xDC:
     break;
-  case 0xDD:
-    break;
+
   case 0xDE:
     break;
   case 0xDF:
@@ -511,8 +525,7 @@ void runOpcode(cpu_t *z80) {
     break;
   case 0xEC:
     break;
-  case 0xED:
-    break;
+
   case 0xEE:
     break;
   case 0xEF:
@@ -543,8 +556,6 @@ void runOpcode(cpu_t *z80) {
     break;
   case 0xFC:
     break;
-  case 0xFD:
-    break;
   case 0xFE:
     break;
   case 0xFF:
@@ -552,3 +563,4 @@ void runOpcode(cpu_t *z80) {
   default:
     printf("Unhandeld Opcode, 0x%X", z80->PC);
   }
+}
