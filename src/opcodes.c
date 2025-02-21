@@ -1,10 +1,16 @@
 #include "common.h"
 #include "z80.h"
 #define LD(A, B) (*(B) = *(A))
+#define LDnn(A, B) (*(B) = A)
 #define ADD(A, B) (*(B) = *(B) + *(A))
-void setFlag(cpu_t *z80, int flag) { *z80->F |= 1 << flag; }
-void clearFlag(cpu_t *z80, int flag) { *z80->F &= ~(1 << flag); }
-bool readFlag(cpu_t *z80, int flag) { return *z80->F & flag; }
+void setFlag(cpu_t *z80, int flag) { z80->F |= 1 << flag; }
+void clearFlag(cpu_t *z80, int flag) { z80->F &= ~(1 << flag); }
+bool readFlag(cpu_t *z80, int flag) { return z80->F & flag; }
+static inline uint16_t nn(struct cpu *z80) {
+  return z80->PC + 1 | (z80->PC + 2) << 8;
+}
+static inline uint16_t n(struct cpu *z80) { return z80->PC + 1; }
+
 void runOpcode(cpu_t *z80) {
   switch (readMem(*z80->PC)) {
   case 0xCB:
@@ -16,20 +22,38 @@ void runOpcode(cpu_t *z80) {
   case 0xFD:
     switch (readMem(*z80->PC + 1)) {}
   case 0x0:
+    z80->PC += 1;
     break;
   case 0x1:
+    LDnn(z80->BC, nn(&z80));
+    z80->PC += 3;
     break;
   case 0x2:
+    readMem(BC) = z80->A;
+    z80->PC += 1;
     break;
   case 0x3:
+    z80->BC++;
+    z80->PC += 1;
     break;
   case 0x4:
+    z80->B++;
+    z80->PC += 1;
     break;
   case 0x5:
+    z80->B--;
+    z80->PC += 1;
     break;
   case 0x6:
+    LD(B, n(&z80));
+    z80->PC += 2;
     break;
   case 0x7:
+    if (z80->A & 0x80) {
+      setFlag(Z80_CF);
+    }
+    z80->A <<= 1;
+    z80->PC += 1;
     break;
   case 0x8:
     break;
@@ -525,4 +549,6 @@ void runOpcode(cpu_t *z80) {
     break;
   case 0xFF:
     break;
+  default:
+    printf("Unhandeld Opcode, 0x%X", z80->PC);
   }
