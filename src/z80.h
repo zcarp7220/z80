@@ -7,9 +7,7 @@
 #define Z80_PF   4 /**< @brief Bitmask of the Z80 P/V flag. */
 #define Z80_NF   2 /**< @brief Bitmask of the Z80 N flag.   */
 #define Z80_CF   1 /**< @brief Bitmask of the Z80 C flag.   */
-void step();
 typedef struct cpu{
-
 bool halt;
 //Registers
 struct{uint8_t A; uint8_t F;};
@@ -27,4 +25,4 @@ uint16_t IY; uint16_t I; uint16_t R;
 
 }cpu_t;
 void runOpcode(struct cpu * z80);
-
+cpu_t step();
