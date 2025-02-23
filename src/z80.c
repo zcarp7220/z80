@@ -2,8 +2,9 @@
 #include "common.h"
 cpu_t z80;
 
-cpu_t step() {
-  // z80.PC = 0x100;
+void step(struct json_object_s *inital, struct json_object_s *final, struct json_string_s *name) {
+  printf("Loading test: %s\n", name->string);
+
   runOpcode(&z80);
 }
 inline int readMem(uint16_t addr) { return ram[addr]; }

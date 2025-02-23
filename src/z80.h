@@ -25,4 +25,3 @@ uint16_t IY; uint16_t I; uint16_t R;
 
 }cpu_t;
 void runOpcode(struct cpu * z80);
-cpu_t step();
