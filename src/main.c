@@ -15,6 +15,11 @@ int main(int argc, char *argv[]) {
   json[fileSize] = '\0';
   fclose(file);
   struct json_value_s *root = json_parse(json, fileSize);
-  struct json_array_s *myTests = json_value_as_array(root->payload);
+  for (struct json_array_element_s *myTests = json_value_as_array(root)->start;
+       myTests->next != NULL; myTests = myTests->next) {
+    struct json_object_s *currentTest = json_value_as_object(myTests->value);
+    printf("%s: %s\n", currentTest->start->name->string,
+           json_value_as_string(currentTest->start->value)->string);
+  }
   return 0;
 }
