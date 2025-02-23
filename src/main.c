@@ -9,11 +9,15 @@ int main(int argc, char *argv[]) {
   FILE *file = fopen(argv[1], "r");
   fseek(file, 0, SEEK_END);
   size_t fileSize = ftell(file);
-  rewind(file);
-  char *json = malloc(fileSize * sizeof(char) + 1);
+  fseek(file, 0, SEEK_SET);
+  char *json = (char *)malloc(fileSize * sizeof(char) + 1);
+  fread(json, 1, fileSize, file);
   json[fileSize] = '\0';
   fclose(file);
-  struct json_value_s *root = json_parse(json, strlen(json));
+  struct json_value_s *root = json_parse(json, fileSize);
+  if (root == NULL) {
+    return -1;
+  }
   struct json_object_s *object = json_value_as_object(root);
   return 0;
 }
