@@ -9,4 +9,4 @@ src/main.c
 src/opcodes.c
 )
 
-target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic)
+target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic -ggdb)
