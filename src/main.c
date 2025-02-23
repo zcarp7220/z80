@@ -15,9 +15,6 @@ int main(int argc, char *argv[]) {
   json[fileSize] = '\0';
   fclose(file);
   struct json_value_s *root = json_parse(json, fileSize);
-  if (root == NULL) {
-    return -1;
-  }
-  struct json_object_s *object = json_value_as_object(root);
+  struct json_array_s *myTests = json_value_as_array(root->payload);
   return 0;
 }
