@@ -28,7 +28,7 @@ void runOpcode(cpu_t *z80) {
     z80->PC += 3;
     break;
   case 0x2:
-    writeMem(z80->A, readMem(z80->BC));
+    writeMem(readMem(z80->BC), z80->A);
     z80->PC += 1;
     break;
   case 0x3:

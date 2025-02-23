@@ -22,7 +22,7 @@ int main(int argc, char *argv[]) {
     struct json_object_s *expectedFinalValue = json_value_as_object(currentTest->next->value);
     step(initalValue, expectedFinalValue, json_value_as_string(json_value_as_object(myTests->value)->start->value));
     myTests = myTests->next;
-    i++;
   }
+  free(root);
   return 0;
 }
