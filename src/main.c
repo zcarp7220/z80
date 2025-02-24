@@ -23,6 +23,9 @@ int main(int argc, char *argv[]) {
     step(initalValue, expectedFinalValue, json_value_as_string(json_value_as_object(myTests->value)->start->value));
     myTests = myTests->next;
   }
+  if (success) {
+    printf("You Passed the test!");
+  }
   free(root);
   return 0;
 }

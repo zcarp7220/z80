@@ -545,4 +545,9 @@ void runOpcode(cpu_t *z80) {
   default:
     printf("Unhandeld Opcode, 0x%X", z80->PC);
   }
+  if (z80->R + 1 == 0x80) {
+    z80->R = 0;
+  } else {
+    z80->R++;
+  }
 }

@@ -1,6 +1,7 @@
 #include "z80.h"
 #include "common.h"
 cpu_t z80;
+bool success = true;
 void set_value(void *var, const char *value, char type) {
   switch (type) {
   case 'w':
@@ -15,7 +16,6 @@ void set_value(void *var, const char *value, char type) {
   }
 }
 void step(struct json_object_s *inital, struct json_object_s *final, struct json_string_s *name) {
-  printf("Loading: %s| Loading registers| ", name->string);
   struct objects {
     void *reg;
     char width;
@@ -35,7 +35,6 @@ void step(struct json_object_s *inital, struct json_object_s *final, struct json
       {&z80.L, 'b', "L"},
       {&z80.I, 'b', "I"},
       {&z80.R, 'b', "R"},
-      {&z80.EI, 'f', "EI"},
       {&z80.IX, 'w', "IX"},
       {&z80.IY, 'w', "IY"},
       {&z80.AFp, 'w', "AF'"},
@@ -49,13 +48,12 @@ void step(struct json_object_s *inital, struct json_object_s *final, struct json
   size_t length = (sizeof(registers) / sizeof(registers[0]));
   struct json_object_element_s *initalObjects = inital->start;
   for (size_t i = 0; i < length;) {
-    if (!(strcmp(initalObjects->name->string, "p") == 0 || strcmp(initalObjects->name->string, "q") == 0 || strcmp(initalObjects->name->string, "wz") == 0)) {
+    if (!(strcmp(initalObjects->name->string, "p") == 0 || strcmp(initalObjects->name->string, "q") == 0 || strcmp(initalObjects->name->string, "wz") == 0 || strcmp(initalObjects->name->string, "ei") == 0)) {
       set_value(registers[i].reg, json_value_as_number(initalObjects->value)->number, registers[i].width);
       i++;
     }
     initalObjects = initalObjects->next;
   }
-  printf("Loading RAM| ");
   struct json_array_s *ramArr = json_value_as_array(initalObjects->value);
   size_t i = 0;
   for (struct json_array_element_s *ramElement = ramArr->start; i < ramArr->length; ramElement = ramElement->next) {
@@ -70,8 +68,9 @@ void step(struct json_object_s *inital, struct json_object_s *final, struct json
     writeMem(address, value);
     i++;
   }
-  printf("Running test: %s| ", name->string);
+  // Da Meat
   runOpcode(&z80);
+
   struct json_object_element_s *finalObjects = final->start;
   int actual = 0;
   struct objects finalRegisters[] = {
@@ -96,11 +95,10 @@ void step(struct json_object_s *inital, struct json_object_s *final, struct json
       {&z80.IFF1, 'f', "IFF1"},
       {&z80.IFF2, 'f', "IFF2"},
       {&z80.IM, 'b', "IM"},
-      {&z80.EI, 'f', "EI"},
 
   };
   for (size_t j = 0; j < length;) {
-    if (!(strcmp(finalObjects->name->string, "p") == 0 || strcmp(finalObjects->name->string, "q") == 0 || strcmp(finalObjects->name->string, "wz") == 0)) {
+    if (!(strcmp(finalObjects->name->string, "p") == 0 || strcmp(finalObjects->name->string, "q") == 0 || strcmp(finalObjects->name->string, "wz") == 0 || strcmp(initalObjects->name->string, "ei") == 0)) {
       if (finalRegisters[j].width == 'b') {
         actual = *(unsigned char *)finalRegisters[j].reg;
       } else if (finalRegisters[j].width == 'w') {
@@ -109,14 +107,14 @@ void step(struct json_object_s *inital, struct json_object_s *final, struct json
         actual = *(unsigned char *)finalRegisters[j].reg;
       }
       if ((actual != atoi(json_value_as_number(finalObjects->value)->number))) {
-        printf("Fail: Expected value for %s is 0x%X, Actual value is %s at 0x%X\n", finalObjects->name->string, atoi(json_value_as_number(finalObjects->value)->number), finalRegisters[j].name, actual);
+        printf("Fail: Expected value for %s is 0x%X, Actual value is %s at 0x%X on test %s\n", finalObjects->name->string, atoi(json_value_as_number(finalObjects->value)->number), finalRegisters[j].name, actual, name->string);
+        success = false;
         return;
       }
       j++;
     }
     finalObjects = finalObjects->next;
   }
-  printf("Pass\n");
 }
 inline int readMem(uint16_t addr) { return ram[addr]; }
 inline void writeMem(uint16_t addr, uint8_t data) { ram[addr] = data; }

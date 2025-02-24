@@ -22,6 +22,6 @@ union{struct{uint8_t Lp; uint8_t Hp;};uint16_t HLp; };
 //Speacal Pourpse Registers
 uint16_t PC; uint16_t SP; uint16_t IX; 
 uint16_t IY; uint16_t I; uint16_t R;
-bool EI; uint8_t IM; bool IFF1; bool IFF2;
+/*bool EI;*/ uint8_t IM; bool IFF1; bool IFF2;
 }cpu_t;
 void runOpcode(struct cpu * z80);
