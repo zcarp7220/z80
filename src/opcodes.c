@@ -7,7 +7,7 @@ void setFlag(cpu_t *z80, int flag) { z80->F |= 1 << flag; }
 void clearFlag(cpu_t *z80, int flag) { z80->F &= ~(1 << flag); }
 bool readFlag(cpu_t *z80, int flag) { return z80->F & flag; }
 static inline uint16_t nn(cpu_t *z80) {
-  return (z80->PC + 1) | (z80->PC + 2) << 8;
+  return readMem(z80->PC + 1) | readMem(z80->PC + 2) << 8;
 }
 static inline uint16_t n(cpu_t *z80) { return z80->PC + 1; }
 void runOpcode(cpu_t *z80) {

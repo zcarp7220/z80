@@ -3,10 +3,11 @@
 uint8_t ram[0xFFFF];
 int main(int argc, char *argv[]) {
   if (argv[1] == NULL) {
-    printf("Please Enter A File Name");
+    printf("Please Enter A File Name\n");
     return 1;
   }
   FILE *file = fopen(argv[1], "r");
+  if(file == NULL){printf("File Does Not Exist");}
   fseek(file, 0, SEEK_END);
   size_t fileSize = ftell(file);
   fseek(file, 0, SEEK_SET);

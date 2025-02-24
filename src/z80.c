@@ -64,7 +64,7 @@ void step(struct json_object_s *inital, struct json_object_s *final, struct json
 
     int address = atoi(json_value_as_number(firstValue)->number);
     int value = atoi(json_value_as_number(secondValue)->number);
-
+    printf("Ram address 0x%X and value is 0x%X\n", address, value);
     writeMem(address, value);
     i++;
   }
@@ -109,7 +109,7 @@ void step(struct json_object_s *inital, struct json_object_s *final, struct json
       if ((actual != atoi(json_value_as_number(finalObjects->value)->number))) {
         printf("Fail: Expected value for %s is 0x%X, Actual value is %s at 0x%X on test %s\n", finalObjects->name->string, atoi(json_value_as_number(finalObjects->value)->number), finalRegisters[j].name, actual, name->string);
         success = false;
-        return;
+        exit(0);
       }
       j++;
     }
