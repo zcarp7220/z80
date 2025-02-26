@@ -1,12 +1,23 @@
 #include "common.h"
-#define Z80_SF 128 /**< @brief Bitmask of the Z80 S flag.   */
-#define Z80_ZF  64 /**< @brief Bitmask of the Z80 Z flag.   */
-#define Z80_YF  32 /**< @brief Bitmask of the Z80 Y flag.   */
-#define Z80_HF  16 /**< @brief Bitmask of the Z80 H flag.   */
-#define Z80_XF   8 /**< @brief Bitmask of the Z80 X flag.   */
-#define Z80_PF   4 /**< @brief Bitmask of the Z80 P/V flag. */
-#define Z80_NF   2 /**< @brief Bitmask of the Z80 N flag.   */
-#define Z80_CF   1 /**< @brief Bitmask of the Z80 C flag.   */
+#define Z80_SF 128 /*  Bitmask of the Z80 S flag.   */
+#define Z80_ZF  64 /*  Bitmask of the Z80 Z flag.   */
+#define Z80_F5  32 /*  Bitmask of the Z80 F5 flag.  */
+#define Z80_HF  16 /*  Bitmask of the Z80 H flag.   */
+#define Z80_F3   8 /*  Bitmask of the Z80 F3 flag.   */
+#define Z80_PF   4 /*  Bitmask of the Z80 P/V flag. */
+#define Z80_NF   2 /*  Bitmask of the Z80 N flag.   */
+#define Z80_CF   1 /*  Bitmask of the Z80 C flag.   */
+
+#define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
+#define BYTE_TO_BINARY(byte)  \
+  ((byte) & 0x80 ? '1' : '0'), \
+  ((byte) & 0x40 ? '1' : '0'), \
+  ((byte) & 0x20 ? '1' : '0'), \
+  ((byte) & 0x10 ? '1' : '0'), \
+  ((byte) & 0x08 ? '1' : '0'), \
+  ((byte) & 0x04 ? '1' : '0'), \
+  ((byte) & 0x02 ? '1' : '0'), \
+  ((byte) & 0x01 ? '1' : '0') 
 typedef struct cpu{
 bool halt;
 //Registers

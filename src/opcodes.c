@@ -3,23 +3,39 @@
 #define LD(A, B) (B = *(A))
 #define LDn(B, A) (B = A)
 #define ADD(A, B) (*(B) = *(B) + *(A))
-void setFlag(cpu_t *z80, int flag) { z80->F |= 1 << flag; }
-void clearFlag(cpu_t *z80, int flag) { z80->F &= ~(1 << flag); }
+void setFlag(cpu_t *z80, int flag) { z80->F |= flag; }
+void clearFlag(cpu_t *z80, int flag) { z80->F &= ~(flag); }
 bool readFlag(cpu_t *z80, int flag) { return z80->F & flag; }
 static inline uint16_t nn(cpu_t *z80) {
   return readMem(z80->PC + 1) | readMem(z80->PC + 2) << 8;
+}
+void checkAndSetSign(cpu_t *z80, uint32_t number, char size){
+  if(((number & 0x80) != 0) && (size == 'b')){ setFlag(z80, Z80_SF);}
+  else if(((number & 0x8000) != 0) && (size == 'w')){ setFlag(z80, Z80_SF);}
+  else{clearFlag(z80, Z80_SF);}
+}
+void checkAndSetZero(cpu_t *z80, int number){
+  if((number == 0)){ setFlag(z80, Z80_ZF);}else{clearFlag(z80, Z80_ZF);}
+}
+void setUndocumentedFlags(cpu_t *z80, int result){
+  if(result & Z80_F3){setFlag(z80, Z80_F3);}else{clearFlag(z80, Z80_F3);}
+  if(result & Z80_F5){setFlag(z80, Z80_F5);}else{clearFlag(z80, Z80_F5);}
 }
 static inline uint16_t n(cpu_t *z80) { return z80->PC + 1; }
 void runOpcode(cpu_t *z80) {
   switch (readMem(z80->PC)) {
   case 0xCB:
     switch (readMem(z80->PC + 1)) {}
+    break;
   case 0xED:
     switch (readMem(z80->PC + 1)) {}
+    break;
   case 0xDD:
     switch (readMem(z80->PC + 1)) {}
+    break;
   case 0xFD:
     switch (readMem(z80->PC + 1)) {}
+    break;
   case 0x0:
     z80->PC += 1;
     break;
@@ -36,6 +52,15 @@ void runOpcode(cpu_t *z80) {
     z80->PC += 1;
     break;
   case 0x4:
+  //printf("Flags " BYTE_TO_BINARY_PATTERN"| Final 0x%X " BYTE_TO_BINARY_PATTERN "\n", BYTE_TO_BINARY(z80->F), z80->B + 1, BYTE_TO_BINARY(z80->B+1));
+  if(z80->B + 1 == 256){
+    setFlag(z80,Z80_PF);
+  }else{clearFlag(z80,Z80_PF);}
+  if((((z80->B + 1) & 0xF ) << 4 ) <= 10){setFlag(z80,Z80_HF);}else{clearFlag(z80,Z80_HF);}
+  setUndocumentedFlags(z80, z80->B + 1);
+  clearFlag(z80,Z80_NF);
+ checkAndSetSign(z80, z80->B, 'b');
+  checkAndSetZero(z80, z80->B);
     z80->B++;
     z80->PC += 1;
     break;
