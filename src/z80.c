@@ -65,7 +65,7 @@ void step(struct json_object_s *inital, struct json_object_s *final, struct json
 
     int address = atoi(json_value_as_number(firstValue)->number);
     int value = atoi(json_value_as_number(secondValue)->number);
-   // printf("Ram address 0x%X and value is 0x%X\n", address, value);
+    // printf("Ram address 0x%X and value is 0x%X\n", address, value);
     writeMem(address, value);
     i++;
   }
@@ -108,14 +108,13 @@ void step(struct json_object_s *inital, struct json_object_s *final, struct json
         actual = *(unsigned char *)finalRegisters[j].reg;
       }
       if ((actual != atoi(json_value_as_number(finalObjects->value)->number))) {
-        if(strcmp(finalRegisters[j].name,"F") != 0){
-        printf("Fail: Expected value for %s is 0x%X, Actual value for %s is 0x%X on test %s\n", finalObjects->name->string, atoi(json_value_as_number(finalObjects->value)->number), finalRegisters[j].name, actual, name->string);
-      }
-        else{
-         // printf("Fail: Expected value for %s is " BYTE_TO_BINARY_PATTERN ", Actual value for %s is "  BYTE_TO_BINARY_PATTERN " Diffrence is " BYTE_TO_BINARY_PATTERN " on test %s, B: 0x%X\n", finalObjects->name->string, BYTE_TO_BINARY(atoi(json_value_as_number(finalObjects->value)->number)), finalRegisters[j].name, BYTE_TO_BINARY(actual),BYTE_TO_BINARY(actual ^ (atoi(json_value_as_number(finalObjects->value)->number))),name->string, z80.B);
+        if (strcmp(finalRegisters[j].name, "F") != 0) {
+          printf("Fail: Expected value for %s is 0x%X, Actual value for %s is 0x%X on test %s\n", finalObjects->name->string, atoi(json_value_as_number(finalObjects->value)->number), finalRegisters[j].name, actual, name->string);
+        } else {
+          printf("Fail: Expected value for %s is " BYTE_TO_BINARY_PATTERN ", Actual value for %s is " BYTE_TO_BINARY_PATTERN " Diffrence is " BYTE_TO_BINARY_PATTERN " on test %s, B: 0x%X\n", finalObjects->name->string, BYTE_TO_BINARY(atoi(json_value_as_number(finalObjects->value)->number)), finalRegisters[j].name, BYTE_TO_BINARY(actual), BYTE_TO_BINARY(actual ^ (atoi(json_value_as_number(finalObjects->value)->number))), name->string, z80.B);
         }
         success = false;
-        //exit(0);
+        // exit(0);
       }
       j++;
     }

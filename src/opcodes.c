@@ -1,6 +1,6 @@
 #include "common.h"
 #include "z80.h"
-int result;
+#include <limits.h>
 #define LD(A, B) (B = *(A))
 #define LDn(B, A) (B = A)
 void setFlag(cpu_t *z80, int flag) { z80->F |= flag; }
@@ -9,25 +9,78 @@ bool readFlag(cpu_t *z80, int flag) { return z80->F & flag; }
 static inline uint16_t nn(cpu_t *z80) {
   return readMem(z80->PC + 1) | readMem(z80->PC + 2) << 8;
 }
-void checkAndSetSign(cpu_t *z80, uint32_t number, char size){
-  if(((number & 0x80) != 0) && (size == 'b')){ setFlag(z80, Z80_SF);}
-  else if(((number & 0x8000) != 0) && (size == 'w')){ setFlag(z80, Z80_SF);}
-  else{clearFlag(z80, Z80_SF);}
+void checkAndSetSign(cpu_t *z80, uint32_t number, char size) {
+  if (((number & 0x80) != 0) && (size == 'b')) {
+    setFlag(z80, Z80_SF);
+  } else if (((number & 0x8000) != 0) && (size == 'w')) {
+    setFlag(z80, Z80_SF);
+  } else {
+    clearFlag(z80, Z80_SF);
+  }
 }
-void checkAndSetZero(cpu_t *z80, int number){
-  if((number == 0)){ setFlag(z80, Z80_ZF);}else{clearFlag(z80, Z80_ZF);}
+void checkAndSetZero(cpu_t *z80, int number) {
+  if ((number == 0)) {
+    setFlag(z80, Z80_ZF);
+  } else {
+    clearFlag(z80, Z80_ZF);
+  }
 }
-void setUndocumentedFlags(cpu_t *z80, int result){
-  if(result & Z80_F3){setFlag(z80, Z80_F3);}else{clearFlag(z80, Z80_F3);}
-  if(result & 32){setFlag(z80, Z80_F5);}else{clearFlag(z80, Z80_F5);}
+void setUndocumentedFlags(cpu_t *z80, int result) {
+  if (result & Z80_F3) {
+    setFlag(z80, Z80_F3);
+  } else {
+    clearFlag(z80, Z80_F3);
+  }
+  if (result & 32) {
+    setFlag(z80, Z80_F5);
+  } else {
+    clearFlag(z80, Z80_F5);
+  }
 }
 void checkAndSetPV(cpu_t *z80, int *result, int prev, char PV, char width) {
-  if(((prev & 0x80) == 0 && (*result & 0x80) != 0) && PV == 'v' && width == 'b'){ setFlag(z80,Z80_PF);}else{clearFlag(z80,Z80_PF);}
-  if(((prev & 0x80) != 0 && (*result & 0x80) == 0) && PV == 'v' && width == 'b'){ setFlag(z80,Z80_PF);}else{clearFlag(z80,Z80_PF);}}
-static inline ADD(cpu_t *z80, )
-static inline uint16_t n(cpu_t *z80) { return readMem(z80->PC + 1); }
-void checkAndSetHalfCarry(cpu_t *z80, int result){
-  if(((result & 0xF ) << 4 ) <= 16){setFlag(z80,Z80_HF);}else{clearFlag(z80,Z80_HF);}
+  if (width == 'b' && PV == 'v') {
+    if (((prev & 0x80) == 0 && (*result & 0x80) != 0) || ((prev & 0x80) != 0 && (*result & 0x80) == 0)) {
+      setFlag(z80, Z80_PF);
+    } else {
+      clearFlag(z80, Z80_PF);
+    }
+  } else {
+    clearFlag(z80, Z80_PF);
+  }
+}
+
+void checkAndSetHalfCarry(cpu_t *z80, int result) {
+  if (((result & 0xF) << 4) <= 0) {
+    setFlag(z80, Z80_HF);
+  } else {
+    clearFlag(z80, Z80_HF);
+  }
+}
+static inline void inc(cpu_t *z80, int *value, bool setFlags) {
+  int result = *value + 1;
+  if (setFlags) {
+    checkAndSetPV(z80, &result, *value, 'v', 'b');
+    setUndocumentedFlags(z80, result);
+    clearFlag(z80, Z80_NF);
+    checkAndSetHalfCarry(z80, result);
+    checkAndSetSign(z80, result, 'b');
+    checkAndSetZero(z80, result);
+  }
+  *value = result;
+  z80->PC += 1;
+}
+static inline void dec(cpu_t *z80, int *value, bool setFlags) {
+  int result = *value - 1;
+  if (setFlags) {
+    checkAndSetPV(z80, &result, *value, 'v', 'b');
+    setUndocumentedFlags(z80, result);
+    setFlag(z80, Z80_NF);
+    checkAndSetHalfCarry(z80, result);
+    checkAndSetSign(z80, result, 'b');
+    checkAndSetZero(z80, result);
+  }
+  *value = result;
+  z80->PC += 1;
 }
 void runOpcode(cpu_t *z80) {
   switch (readMem(z80->PC)) {
@@ -55,44 +108,32 @@ void runOpcode(cpu_t *z80) {
     z80->PC += 1;
     break;
   case 0x3:
-    z80->BC++;
-    z80->PC += 1;
+    inc(z80, &z80->BC, false);
     break;
   case 0x4:
-  result = z80->B + 1;
-  checkAndSetPV(z80, &result, z80->B, 'v', 'b');
-  setUndocumentedFlags(z80, result);
-  clearFlag(z80,Z80_NF);
-  checkAndSetHalfCarry(z80, result);
- checkAndSetSign(z80, result, 'b');
-  checkAndSetZero(z80, result);
-    z80->B = result;
-    z80->PC += 1;
+    inc(z80, &z80->B, true);
     break;
   case 0x5:
-  result = z80-> B - 1;
-  checkAndSetSign(z80, result, 'b');
-  checkAndSetZero(z80, result);
-  checkAndSetHalfCarry(z80, result);
-  setUndocumentedFlags(z80, result);
-  setFlag(z80, Z80_NF);
-  checkAndSetPV(z80, &result, z80->B, 'v', 'b');
-    z80->B  = result;
-    z80->PC += 1;
+    dec(z80, &z80->B, true);
     break;
   case 0x6:
-    LDn(z80->B, n(z80));
+    LDn(z80->B, readMem(z80->PC + 1));
     z80->PC += 2;
     break;
   case 0x7:
     if (z80->A * 2 & 0x80) {
       setFlag(z80, Z80_CF);
-    }else{clearFlag(z80, Z80_CF);}
+    } else {
+      clearFlag(z80, Z80_CF);
+    }
     clearFlag(z80, Z80_NF);
     clearFlag(z80, Z80_HF);
-    printf("A: 0x%X res: 0x%X\n",z80->A, z80->A *= 2);
     z80->A = z80->A << 1;
-    if(Z80_CF){z80->A |= 0x1;}else{z80->A &= 0x1;}
+    if (Z80_CF) {
+      z80->A |= 0x1;
+    } else {
+      z80->A &= 0x1;
+    }
     z80->PC += 1;
     break;
   case 0x8:
