@@ -1,8 +1,8 @@
 #include "common.h"
 #include "z80.h"
+int result;
 #define LD(A, B) (B = *(A))
 #define LDn(B, A) (B = A)
-#define ADD(A, B) (*(B) = *(B) + *(A))
 void setFlag(cpu_t *z80, int flag) { z80->F |= flag; }
 void clearFlag(cpu_t *z80, int flag) { z80->F &= ~(flag); }
 bool readFlag(cpu_t *z80, int flag) { return z80->F & flag; }
@@ -19,9 +19,16 @@ void checkAndSetZero(cpu_t *z80, int number){
 }
 void setUndocumentedFlags(cpu_t *z80, int result){
   if(result & Z80_F3){setFlag(z80, Z80_F3);}else{clearFlag(z80, Z80_F3);}
-  if(result & Z80_F5){setFlag(z80, Z80_F5);}else{clearFlag(z80, Z80_F5);}
+  if(result & 32){setFlag(z80, Z80_F5);}else{clearFlag(z80, Z80_F5);}
 }
-static inline uint16_t n(cpu_t *z80) { return z80->PC + 1; }
+void checkAndSetPV(cpu_t *z80, int *result, int prev, char PV, char width) {
+  if(((prev & 0x80) == 0 && (*result & 0x80) != 0) && PV == 'v' && width == 'b'){ setFlag(z80,Z80_PF);}else{clearFlag(z80,Z80_PF);}
+  if(((prev & 0x80) != 0 && (*result & 0x80) == 0) && PV == 'v' && width == 'b'){ setFlag(z80,Z80_PF);}else{clearFlag(z80,Z80_PF);}}
+static inline ADD(cpu_t *z80, )
+static inline uint16_t n(cpu_t *z80) { return readMem(z80->PC + 1); }
+void checkAndSetHalfCarry(cpu_t *z80, int result){
+  if(((result & 0xF ) << 4 ) <= 16){setFlag(z80,Z80_HF);}else{clearFlag(z80,Z80_HF);}
+}
 void runOpcode(cpu_t *z80) {
   switch (readMem(z80->PC)) {
   case 0xCB:
@@ -52,20 +59,25 @@ void runOpcode(cpu_t *z80) {
     z80->PC += 1;
     break;
   case 0x4:
-  //printf("Flags " BYTE_TO_BINARY_PATTERN"| Final 0x%X " BYTE_TO_BINARY_PATTERN "\n", BYTE_TO_BINARY(z80->F), z80->B + 1, BYTE_TO_BINARY(z80->B+1));
-  if(z80->B + 1 == 256){
-    setFlag(z80,Z80_PF);
-  }else{clearFlag(z80,Z80_PF);}
-  if((((z80->B + 1) & 0xF ) << 4 ) <= 10){setFlag(z80,Z80_HF);}else{clearFlag(z80,Z80_HF);}
-  setUndocumentedFlags(z80, z80->B + 1);
+  result = z80->B + 1;
+  checkAndSetPV(z80, &result, z80->B, 'v', 'b');
+  setUndocumentedFlags(z80, result);
   clearFlag(z80,Z80_NF);
- checkAndSetSign(z80, z80->B, 'b');
-  checkAndSetZero(z80, z80->B);
-    z80->B++;
+  checkAndSetHalfCarry(z80, result);
+ checkAndSetSign(z80, result, 'b');
+  checkAndSetZero(z80, result);
+    z80->B = result;
     z80->PC += 1;
     break;
   case 0x5:
-    z80->B--;
+  result = z80-> B - 1;
+  checkAndSetSign(z80, result, 'b');
+  checkAndSetZero(z80, result);
+  checkAndSetHalfCarry(z80, result);
+  setUndocumentedFlags(z80, result);
+  setFlag(z80, Z80_NF);
+  checkAndSetPV(z80, &result, z80->B, 'v', 'b');
+    z80->B  = result;
     z80->PC += 1;
     break;
   case 0x6:
@@ -73,10 +85,14 @@ void runOpcode(cpu_t *z80) {
     z80->PC += 2;
     break;
   case 0x7:
-    if (z80->A & 0x80) {
+    if (z80->A * 2 & 0x80) {
       setFlag(z80, Z80_CF);
-    }
-    z80->A <<= 1;
+    }else{clearFlag(z80, Z80_CF);}
+    clearFlag(z80, Z80_NF);
+    clearFlag(z80, Z80_HF);
+    printf("A: 0x%X res: 0x%X\n",z80->A, z80->A *= 2);
+    z80->A = z80->A << 1;
+    if(Z80_CF){z80->A |= 0x1;}else{z80->A &= 0x1;}
     z80->PC += 1;
     break;
   case 0x8:
