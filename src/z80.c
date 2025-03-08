@@ -111,15 +111,13 @@ void step(struct json_object_s *inital, struct json_object_s *final, struct json
         if (strcmp(finalRegisters[j].name, "F") != 0) {
           printf("Fail: Expected value for %s is 0x%X, Actual value for %s is 0x%X on test %s\n", finalObjects->name->string, atoi(json_value_as_number(finalObjects->value)->number), finalRegisters[j].name, actual, name->string);
         } else {
-          printf("Fail: Expected value for %s is " BYTE_TO_BINARY_PATTERN ", Actual value for %s is " BYTE_TO_BINARY_PATTERN " Diffrence is " BYTE_TO_BINARY_PATTERN " on test %s, B: 0x%X\n", finalObjects->name->string, BYTE_TO_BINARY(atoi(json_value_as_number(finalObjects->value)->number)), finalRegisters[j].name, BYTE_TO_BINARY(actual), BYTE_TO_BINARY(actual ^ (atoi(json_value_as_number(finalObjects->value)->number))), name->string, z80.B);
+          printf("Fail: Expected value for %s is " BYTE_TO_BINARY_PATTERN ", Actual value for %s is " BYTE_TO_BINARY_PATTERN " Diffrence is " BYTE_TO_BINARY_PATTERN " on test %s\n", finalObjects->name->string, BYTE_TO_BINARY(atoi(json_value_as_number(finalObjects->value)->number)), finalRegisters[j].name, BYTE_TO_BINARY(actual), BYTE_TO_BINARY(actual ^ (atoi(json_value_as_number(finalObjects->value)->number))), name->string);
         }
         success = false;
-        // exit(0);
+        //        exit(0);
       }
       j++;
     }
     finalObjects = finalObjects->next;
   }
 }
-inline int readMem(uint16_t addr) { return ram[addr]; }
-inline void writeMem(uint16_t addr, uint8_t data) { ram[addr] = data; }

@@ -1,13 +1,17 @@
 #include "common.h"
 #include "json.h"
 uint8_t ram[0xFFFF];
+inline void writeMem(uint16_t addr, uint8_t data) { ram[addr] = data; }
+inline int readMem(uint16_t addr) { return ram[addr]; }
 int main(int argc, char *argv[]) {
   if (argv[1] == NULL) {
     printf("Please Enter A File Name\n");
     return 1;
   }
   FILE *file = fopen(argv[1], "r");
-  if(file == NULL){printf("File Does Not Exist");}
+  if (file == NULL) {
+    printf("File Does Not Exist");
+  }
   fseek(file, 0, SEEK_END);
   size_t fileSize = ftell(file);
   fseek(file, 0, SEEK_SET);
