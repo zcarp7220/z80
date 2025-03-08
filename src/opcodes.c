@@ -3,170 +3,170 @@
 #include <limits.h>
 #define LD(A, B) (B = *(A))
 #define LDn(B, A) (B = A)
-void setFlag(cpu_t *z80, int flag) { z80->F |= flag; }
-void clearFlag(cpu_t *z80, int flag) { z80->F &= ~(flag); }
-bool readFlag(cpu_t *z80, int flag) { return z80->F & flag; }
-static inline uint16_t nn(cpu_t *z80) {
-  return readMem(z80->PC + 1) | readMem(z80->PC + 2) << 8;
+void setFlag(int flag) { z80.F |= flag; }
+void clearFlag(int flag) { z80.F &= ~(flag); }
+bool readFlag(int flag) { return z80.F & flag; }
+static inline uint16_t nn() {
+  return readMem(z80.PC + 1) | readMem(z80.PC + 2) << 8;
 }
-void checkAndSetSign(cpu_t *z80, uint32_t number, char size) {
+void checkAndSetSign(uint32_t number, char size) {
   if (((number & 0x80) != 0) && (size == 'b')) {
-    setFlag(z80, Z80_SF);
+    setFlag(Z80_SF);
   } else if (((number & 0x8000) != 0) && (size == 'w')) {
-    setFlag(z80, Z80_SF);
+    setFlag(Z80_SF);
   } else {
-    clearFlag(z80, Z80_SF);
+    clearFlag(Z80_SF);
   }
 }
-void checkAndSetZero(cpu_t *z80, int number) {
+void checkAndSetZero(int number) {
   if ((number == 0)) {
-    setFlag(z80, Z80_ZF);
+    setFlag(Z80_ZF);
   } else {
-    clearFlag(z80, Z80_ZF);
+    clearFlag(Z80_ZF);
   }
 }
-void setUndocumentedFlags(cpu_t *z80, int result) {
+void setUndocumentedFlags(int result) {
   if (result & Z80_F3) {
-    setFlag(z80, Z80_F3);
+    setFlag(Z80_F3);
   } else {
-    clearFlag(z80, Z80_F3);
+    clearFlag(Z80_F3);
   }
   if (result & 32) {
-    setFlag(z80, Z80_F5);
+    setFlag(Z80_F5);
   } else {
-    clearFlag(z80, Z80_F5);
+    clearFlag(Z80_F5);
   }
 }
-void checkAndSetPV(cpu_t *z80, int *result, int prev, char PV, char width) {
+void checkAndSetPV(int *result, int prev, char PV, char width) {
   if (width == 'b' && PV == 'v') {
     if (((prev & 0x80) == 0 && (*result & 0x80) != 0) || ((prev & 0x80) != 0 && (*result & 0x80) == 0)) {
-      setFlag(z80, Z80_PF);
+      setFlag(Z80_PF);
     } else {
-      clearFlag(z80, Z80_PF);
+      clearFlag(Z80_PF);
     }
   } else {
-    clearFlag(z80, Z80_PF);
+    clearFlag(Z80_PF);
   }
 }
-static inline void add(cpu_t *z80, int A, int B, void *storeLocation, char width) {
+static inline void add(int A, int B, void *storeLocation, char width) {
   int result = A + B;
-  clearFlag(z80, Z80_NF);
-  setUndocumentedFlags(z80, result);
+  clearFlag(Z80_NF);
+  setUndocumentedFlags(result);
   if (width == 'b') {
     if ((uint8_t)result == 0) {
-      setFlag(z80, Z80_ZF);
+      setFlag(Z80_ZF);
     } else {
-      clearFlag(z80, Z80_ZF);
+      clearFlag(Z80_ZF);
     }
     if (((A & 0x80) == 0 && (result & 0x80) != 0)) {
-      setFlag(z80, Z80_PF);
+      setFlag(Z80_PF);
     } else {
-      clearFlag(z80, Z80_PF);
+      clearFlag(Z80_PF);
     }
     if ((result & 0x80) != 0) {
-      setFlag(z80, Z80_SF);
+      setFlag(Z80_SF);
     } else {
-      clearFlag(z80, Z80_SF);
+      clearFlag(Z80_SF);
     }
     if (((result & 0xF) << 4) <= 0) {
-      setFlag(z80, Z80_HF);
+      setFlag(Z80_HF);
     } else {
-      clearFlag(z80, Z80_HF);
+      clearFlag(Z80_HF);
     }
     *(uint8_t *)storeLocation = result;
   }
-  z80->PC += 1;
+  z80.PC += 1;
 }
-static inline void sub(cpu_t *z80, int A, int B, void *storeLocation, char width) {
+static inline void sub(int A, int B, void *storeLocation, char width) {
   int result = A - B;
-  setFlag(z80, Z80_NF);
-  setUndocumentedFlags(z80, result);
+  setFlag(Z80_NF);
+  setUndocumentedFlags(result);
   if (width == 'b') {
     if ((uint8_t)result == 0) {
-      setFlag(z80, Z80_ZF);
+      setFlag(Z80_ZF);
     } else {
-      clearFlag(z80, Z80_ZF);
+      clearFlag(Z80_ZF);
     }
     if (((A & 0x80) != 0 && (result & 0x80) == 0)) {
-      setFlag(z80, Z80_PF);
+      setFlag(Z80_PF);
     } else {
-      clearFlag(z80, Z80_PF);
+      clearFlag(Z80_PF);
     }
     if ((result & 0x80) != 0) {
-      setFlag(z80, Z80_SF);
+      setFlag(Z80_SF);
     } else {
-      clearFlag(z80, Z80_SF);
+      clearFlag(Z80_SF);
     }
     if ((A & 0x0F) < (B & 0x0F)) {
-      setFlag(z80, Z80_HF);
+      setFlag(Z80_HF);
     } else {
-      clearFlag(z80, Z80_HF);
+      clearFlag(Z80_HF);
     }
     *(uint8_t *)storeLocation = result;
   }
-  z80->PC += 1;
+  z80.PC += 1;
 }
-static inline void inc(cpu_t *z80, uint8_t *value) {
-  add(z80, *value, 1, value, 'b');
+static inline void inc(uint8_t *value) {
+  add(*value, 1, value, 'b');
 }
-static inline void dec(cpu_t *z80, uint8_t *value) {
-  sub(z80, *value, 1, value, 'b');
+static inline void dec(uint8_t *value) {
+  sub(*value, 1, value, 'b');
 }
 
-void runOpcode(cpu_t *z80) {
-  switch (readMem(z80->PC)) {
+void runOpcode() {
+  switch (readMem(z80.PC)) {
   case 0xCB:
-    switch (readMem(z80->PC + 1)) {}
+    switch (readMem(z80.PC + 1)) {}
     break;
   case 0xED:
-    switch (readMem(z80->PC + 1)) {}
+    switch (readMem(z80.PC + 1)) {}
     break;
   case 0xDD:
-    switch (readMem(z80->PC + 1)) {}
+    switch (readMem(z80.PC + 1)) {}
     break;
   case 0xFD:
-    switch (readMem(z80->PC + 1)) {}
+    switch (readMem(z80.PC + 1)) {}
     break;
   case 0x0:
-    z80->PC += 1;
+    z80.PC += 1;
     break;
   case 0x1:
-    LDn(z80->BC, nn(z80));
-    z80->PC += 3;
+    LDn(z80.BC, nn(z80));
+    z80.PC += 3;
     break;
   case 0x2:
-    writeMem(readMem(z80->BC), z80->A);
-    z80->PC += 1;
+    writeMem(readMem(z80.BC), z80.A);
+    z80.PC += 1;
     break;
   case 0x3:
-    z80->BC++;
-    z80->PC += 1;
+    z80.BC++;
+    z80.PC += 1;
     break;
   case 0x4:
-    inc(z80, &z80->B);
+    inc(&z80.B);
     break;
   case 0x5:
-    dec(z80, &z80->B);
+    dec(&z80.B);
     break;
   case 0x6:
-    LDn(z80->B, readMem(z80->PC + 1));
-    z80->PC += 2;
+    LDn(z80.B, readMem(z80.PC + 1));
+    z80.PC += 2;
     break;
   case 0x7:
-    if (z80->A * 2 & 0x80) {
-      setFlag(z80, Z80_CF);
+    if (z80.A * 2 & 0x80) {
+      setFlag(Z80_CF);
     } else {
-      clearFlag(z80, Z80_CF);
+      clearFlag(Z80_CF);
     }
-    clearFlag(z80, Z80_NF);
-    clearFlag(z80, Z80_HF);
-    z80->A = z80->A << 1;
+    clearFlag(Z80_NF);
+    clearFlag(Z80_HF);
+    z80.A = z80.A << 1;
     if (Z80_CF) {
-      z80->A |= 0x1;
+      z80.A |= 0x1;
     } else {
-      z80->A &= 0x1;
+      z80.A &= 0x1;
     }
-    z80->PC += 1;
+    z80.PC += 1;
     break;
   case 0x8:
     break;
@@ -657,11 +657,11 @@ void runOpcode(cpu_t *z80) {
   case 0xFF:
     break;
   default:
-    printf("Unhandeld Opcode, 0x%X", z80->PC);
+    printf("Unhandeld Opcode, 0x%X", z80.PC);
   }
-  if (z80->R + 1 == 0x80) {
-    z80->R = 0;
+  if (z80.R + 1 == 0x80) {
+    z80.R = 0;
   } else {
-    z80->R++;
+    z80.R++;
   }
 }

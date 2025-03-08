@@ -70,7 +70,7 @@ void step(struct json_object_s *inital, struct json_object_s *final, struct json
     i++;
   }
   // Da Meat
-  runOpcode(&z80);
+  runOpcode();
 
   struct json_object_element_s *finalObjects = final->start;
   int actual = 0;
