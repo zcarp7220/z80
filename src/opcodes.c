@@ -6,8 +6,16 @@
 void setFlag(int flag) { z80.F |= flag; }
 void clearFlag(int flag) { z80.F &= ~(flag); }
 bool readFlag(int flag) { return z80.F & flag; }
+
 static inline uint16_t nn() {
   return readMem(z80.PC + 1) | readMem(z80.PC + 2) << 8;
+}
+static inline void checkClear(int flag, bool conditon) {
+  if (conditon) {
+    setFlag(flag);
+  } else {
+    clearFlag(flag);
+  }
 }
 void checkAndSetSign(uint32_t number, char size) {
   if (((number & 0x80) != 0) && (size == 'b')) {
@@ -31,7 +39,7 @@ void setUndocumentedFlags(int result) {
   } else {
     clearFlag(Z80_F3);
   }
-  if (result & 32) {
+  if (result & Z80_F5) {
     setFlag(Z80_F5);
   } else {
     clearFlag(Z80_F5);
@@ -51,29 +59,31 @@ void checkAndSetPV(int *result, int prev, char PV, char width) {
 static inline void add(int A, int B, void *storeLocation, char width) {
   int result = A + B;
   clearFlag(Z80_NF);
-  setUndocumentedFlags(result);
   if (width == 'b') {
-    if ((uint8_t)result == 0) {
+    setUndocumentedFlags(result);
+    checkClear(Z80_ZF, (uint8_t)result == 0);
+    checkClear(Z80_PF, ((A & 0x80) == 0 && (result & 0x80) != 0));
+    checkClear(Z80_SF, (result & 0x80) != 0);
+    checkClear(Z80_HF, ((result & 0xF) << 4) <= 0);
+    checkClear(Z80_CF, result > 255);
+    *(uint8_t *)storeLocation = result;
+  } else if (width == 'w') {
+    /*if ((uint16_t)result == 0) {
       setFlag(Z80_ZF);
     } else {
       clearFlag(Z80_ZF);
-    }
-    if (((A & 0x80) == 0 && (result & 0x80) != 0)) {
-      setFlag(Z80_PF);
-    } else {
-      clearFlag(Z80_PF);
-    }
-    if ((result & 0x80) != 0) {
-      setFlag(Z80_SF);
-    } else {
-      clearFlag(Z80_SF);
-    }
-    if (((result & 0xF) << 4) <= 0) {
-      setFlag(Z80_HF);
-    } else {
-      clearFlag(Z80_HF);
-    }
-    *(uint8_t *)storeLocation = result;
+    }*/
+
+    /* if (((A & 0x8000) == 0 && (result & 0x8000) != 0)) {
+       setFlag(Z80_PF);
+     } else {
+       clearFlag(Z80_PF);
+     }*/
+    setUndocumentedFlags(result >> 8);
+    checkClear(Z80_SF, (result & 0x8000) != 0);
+    checkClear(Z80_HF, ((result & 0xF0) << 8) <= 0);
+    checkClear(Z80_CF, result > 65535);
+    *(uint16_t *)storeLocation = result;
   }
   z80.PC += 1;
 }
@@ -106,8 +116,57 @@ static inline void sub(int A, int B, void *storeLocation, char width) {
   }
   z80.PC += 1;
 }
+static inline void rotateC(char direction, void *val, char size) {
+  int result;
+  clearFlag(Z80_HF);
+  clearFlag(Z80_NF);
+  if (size == 'b') {
+    if (direction == 'l') {
+      result = (*(uint8_t *)val << 1) | (*(uint8_t *)val >> 7);
+    } else if (direction == 'r') {
+      result = (*(uint8_t *)val >> 1) | (*(uint8_t *)val << 7);
+    }
+    if ((result & 1) != 0) {
+      setFlag(Z80_CF);
+    } else {
+      clearFlag(Z80_CF);
+    }
+    setUndocumentedFlags(result);
+    *(uint8_t *)val = result;
+    z80.PC += 1;
+  }
+}
+static inline void rotate(char direction, void *val, char size) {
+  int result;
+  clearFlag(Z80_HF);
+  clearFlag(Z80_NF);
+  if (size == 'b') {
+    if (direction == 'l') {
+      result = (*(uint8_t *)val << 1) | (*(uint8_t *)val >> 8);
+    } else if (direction == 'r') {
+      result = (*(uint8_t *)val >> 1) | (*(uint8_t *)val << 8);
+    }
+    if ((result & 0x100) != 0) {
+      setFlag(Z80_CF);
+    } else {
+      clearFlag(Z80_CF);
+    }
+    setUndocumentedFlags(result);
+    *(uint8_t *)val = result;
+    z80.PC += 1;
+  }
+}
+static inline void exchangeRegisters(uint16_t *A, uint16_t *B) {
+  uint16_t temp;
+  temp = *B;
+  *B = *A;
+  *A = temp;
+  z80.PC += 1;
+}
 static inline void inc(uint8_t *value) {
+  bool oldCarry = readFlag(Z80_CF);
   add(*value, 1, value, 'b');
+  checkClear(Z80_CF, oldCarry);
 }
 static inline void dec(uint8_t *value) {
   sub(*value, 1, value, 'b');
@@ -153,24 +212,13 @@ void runOpcode() {
     z80.PC += 2;
     break;
   case 0x7:
-    if (z80.A * 2 & 0x80) {
-      setFlag(Z80_CF);
-    } else {
-      clearFlag(Z80_CF);
-    }
-    clearFlag(Z80_NF);
-    clearFlag(Z80_HF);
-    z80.A = z80.A << 1;
-    if (Z80_CF) {
-      z80.A |= 0x1;
-    } else {
-      z80.A &= 0x1;
-    }
-    z80.PC += 1;
+    rotate('l', &z80.A, 'b');
     break;
   case 0x8:
+    exchangeRegisters(&z80.AF, &z80.AFp);
     break;
   case 0x9:
+    add(z80.BC, z80.HL, &z80.HL, 'w');
     break;
   case 0xA:
     break;
