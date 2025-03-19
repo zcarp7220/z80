@@ -1,16 +1,18 @@
 #include "common.h"
 #include "z80.h"
 #include <limits.h>
-#define LD(A, B) (B = *(A))
-#define LDn(B, A) (B = A)
+#define LD(B, A) (B = A)
 void setFlag(int flag) { z80.F |= flag; }
 void clearFlag(int flag) { z80.F &= ~(flag); }
 bool readFlag(int flag) { return z80.F & flag; }
 
-static inline uint16_t nn() {
+static inline uint16_t getVal16() {
   return readMem(z80.PC + 1) | readMem(z80.PC + 2) << 8;
 }
-static inline void checkClear(int flag, bool conditon) {
+static inline uint16_t getVal8() {
+  return readMem(z80.PC + 1);
+}
+static inline void checkSet(int flag, bool conditon) {
   if (conditon) {
     setFlag(flag);
   } else {
@@ -61,28 +63,16 @@ static inline void add(int A, int B, void *storeLocation, char width) {
   clearFlag(Z80_NF);
   if (width == 'b') {
     setUndocumentedFlags(result);
-    checkClear(Z80_ZF, (uint8_t)result == 0);
-    checkClear(Z80_PF, ((A & 0x80) == 0 && (result & 0x80) != 0));
-    checkClear(Z80_SF, (result & 0x80) != 0);
-    checkClear(Z80_HF, ((result & 0xF) << 4) <= 0);
-    checkClear(Z80_CF, result > 255);
+    checkSet(Z80_ZF, (uint8_t)result == 0);
+    checkSet(Z80_PF, ((A & 0x80) == 0 && (result & 0x80) != 0));
+    checkSet(Z80_SF, (result & 0x80) != 0);
+    checkSet(Z80_HF, ((result & 0xF) << 4) <= 0);
+    checkSet(Z80_CF, result > 255);
     *(uint8_t *)storeLocation = result;
   } else if (width == 'w') {
-    /*if ((uint16_t)result == 0) {
-      setFlag(Z80_ZF);
-    } else {
-      clearFlag(Z80_ZF);
-    }*/
-
-    /* if (((A & 0x8000) == 0 && (result & 0x8000) != 0)) {
-       setFlag(Z80_PF);
-     } else {
-       clearFlag(Z80_PF);
-     }*/
     setUndocumentedFlags(result >> 8);
-    checkClear(Z80_SF, (result & 0x8000) != 0);
-    checkClear(Z80_HF, ((result & 0xF0) << 8) <= 0);
-    checkClear(Z80_CF, result > 65535);
+    checkSet(Z80_HF, (((A ^ (B) ^ result) >> 8) & Z80_HF));
+    checkSet(Z80_CF, result > 65535);
     *(uint16_t *)storeLocation = result;
   }
   z80.PC += 1;
@@ -166,7 +156,7 @@ static inline void exchangeRegisters(uint16_t *A, uint16_t *B) {
 static inline void inc(uint8_t *value) {
   bool oldCarry = readFlag(Z80_CF);
   add(*value, 1, value, 'b');
-  checkClear(Z80_CF, oldCarry);
+  checkSet(Z80_CF, oldCarry);
 }
 static inline void dec(uint8_t *value) {
   sub(*value, 1, value, 'b');
@@ -190,7 +180,7 @@ void runOpcode() {
     z80.PC += 1;
     break;
   case 0x1:
-    LDn(z80.BC, nn(z80));
+    LD(z80.BC, getVal16(z80));
     z80.PC += 3;
     break;
   case 0x2:
@@ -208,11 +198,11 @@ void runOpcode() {
     dec(&z80.B);
     break;
   case 0x6:
-    LDn(z80.B, readMem(z80.PC + 1));
+    LD(z80.B, readMem(z80.PC + 1));
     z80.PC += 2;
     break;
   case 0x7:
-    rotate('l', &z80.A, 'b');
+    rotateC('l', &z80.A, 'b');
     break;
   case 0x8:
     exchangeRegisters(&z80.AF, &z80.AFp);
@@ -221,16 +211,25 @@ void runOpcode() {
     add(z80.BC, z80.HL, &z80.HL, 'w');
     break;
   case 0xA:
+  LD(z80.A,readMem(z80.BC));
+  z80.PC += 1;
     break;
   case 0xB:
+  z80.BC--;
+  z80.PC += 1;
     break;
   case 0xC:
+  inc(&z80.C);
     break;
   case 0xD:
+    dec(&z80.C);
     break;
   case 0xE:
+    LD(z80.C, getVal8());
+    z80.PC += 1;
     break;
   case 0xF:
+  rotate('r',&z80.A,'b');
     break;
   case 0x10:
     break;
