@@ -1,20 +1,23 @@
 #include "common.h"
 #include "z80.h"
-#include <limits.h>
-#define LD(B, A) (B = A); z80.PC += 1;
+#define LD(B, A) (B = A); z80.PC += 2;
 void setFlag(int flag) { z80.F |= flag; }
 void clearFlag(int flag) { z80.F &= ~(flag); }
 bool readFlag(int flag) { return z80.F & flag; }
 
 static inline uint16_t getVal16() {
-  z80.PC += 2;
-  return readMem(z80.PC - 1) | readMem(z80.PC) << 8;
+  return readMem(z80.PC + 1) | readMem(z80.PC + 2) << 8;
 }
 
 
-static inline uint16_t getVal8() {
+static inline uint8_t getVal8() {
+  return readMem(z80.PC + 1);
+}
+
+static inline uint16_t getValueAtMemory(){
+  int address = readMem(getVal16()) | readMem(getVal16() + 1) << 8;
   z80.PC += 1;
-  return readMem(z80.PC);
+  return address;
 }
 
 static inline void checkSet(int flag, bool conditon) {
@@ -152,17 +155,11 @@ static inline void rotate(char direction, void *val, char size) {
   if (size == 'b') { 
      uint8_t value = *(uint8_t *)val;
     if (direction == 'l') {
-      result = (value << 1) | (value >> 8);
-      if(readFlag(Z80_CF)){
-        result |= 1;
-      }
+      result = (value << 1) | (value >> 8) | readFlag(Z80_CF);
       checkSet(Z80_CF, result & 0x100);
     } else if (direction == 'r') { 
-      result = (value >> 1);
-      if(readFlag(Z80_CF)){
-        result |= 0x80;
-      }
-      checkSet(Z80_CF, value & 0x80 != 0);
+      result = (value >> 1) | (readFlag(Z80_CF) << 7);
+      checkSet(Z80_CF, (value & 0x80) != 0);
     }
     setUndocumentedFlags(result);
     *(uint8_t *)val = result;
@@ -191,11 +188,48 @@ void jr(bool condition){
 void dnjz(){
   z80.B--;
   if (z80.B != 0){
-    z80.PC += (int8_t)readMem(z80.PC + 1);
+    z80.PC += (int8_t)getVal8();
   }
   z80.PC += 2;
 }
+//Algorithm adapted from:
+  //https://worldofspectrum.org/faq/reference/z80reference.htm#DAA
+void daa(){
+  
+int afterA = z80.A;
+  int correctFactor = 0;
+ if(z80.A > 0x99 || readFlag(Z80_CF)){
+  correctFactor += 0x60;
+  setFlag(Z80_CF);
+ }else{
+  clearFlag(Z80_CF);
+ }
+ if((z80.A & 0xF) > 9 || readFlag(Z80_HF)){
+  correctFactor += 0x6;
+ }
+ if(!readFlag(Z80_NF)){
+  afterA += correctFactor;
+ }else{
+  afterA -= correctFactor;
+ }
+ setUndocumentedFlags(afterA);
+ checkSet(Z80_HF, ((z80.A & 0x0F) + (afterA & 0x0F)) > 0x0F);
+ checkSet(Z80_ZF, afterA == 0);
+ //checkSet(Z80_PF, parity(afterA));
+ checkSet(Z80_SF, (afterA & 0x80) != 0 );
+ z80.A = afterA;
+ z80.PC += 1;
+}
 
+
+
+void cpl(){
+  setFlag(Z80_NF);
+  setFlag(Z80_HF);
+  z80.A = ~z80.A;
+  setUndocumentedFlags(z80.A);
+  z80.PC += 1;
+}
 
 static inline void inc8(uint8_t *value) {
   bool oldCarry = readFlag(Z80_CF);
@@ -319,7 +353,6 @@ inc16(&z80.BC);
     break;
   case 0x1B:
   dec16(&z80.DE);
-  
     break;
   case 0x1C:
   inc8(&z80.E);
@@ -334,36 +367,53 @@ inc16(&z80.BC);
   rotate('r',&z80.A,'b');
     break;
   case 0x20:
+  jr(!readFlag(Z80_ZF));
     break;
   case 0x21:
+  LD(z80.HL, getVal16());
     break;
   case 0x22:
+  writeMem(getVal16(), z80.HL);
+  z80.PC += 2;
     break;
   case 0x23:
+  inc16(&z80.HL);
     break;
   case 0x24:
+  inc8(&z80.H);
     break;
   case 0x25:
+  dec8(&z80.H);
     break;
   case 0x26:
+  LD(z80.H, getVal8());
     break;
   case 0x27:
+    daa();
     break;
   case 0x28:
+  jr(readFlag(Z80_ZF));
     break;
   case 0x29:
+  add(z80.HL,z80.HL,&z80.HL, 'w');
     break;
   case 0x2A:
+  LD(z80.HL, getValueAtMemory());
     break;
   case 0x2B:
+  dec16(&z80.HL);
     break;
   case 0x2C:
+  inc8(&z80.L);
     break;
   case 0x2D:
+  dec8(&z80.L);
     break;
   case 0x2E:
+  LD(z80.L, getVal8());
     break;
   case 0x2F:
+  cpl();
     break;
   case 0x30:
     break;
