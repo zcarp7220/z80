@@ -1,7 +1,7 @@
 #include "z80.h"
 #include "common.h"
 
-cpu_t z80;
+cpu_t z80 = {0};
 bool success = true;
 void set_value(void *var, const char *value, char type) {
   switch (type) {
@@ -70,8 +70,12 @@ void step(struct json_object_s *inital, struct json_object_s *final, struct json
     i++;
   }
   // Da Meat
-  runOpcode();
-
+  handleInterupts();
+  if (!z80.halt) {
+    runOpcode(readMem(z80.PC));
+  } else {
+    runOpcode(0x0);
+  }
   struct json_object_element_s *finalObjects = final->start;
   int actual = 0;
   struct objects finalRegisters[] = {
@@ -121,5 +125,9 @@ void step(struct json_object_s *inital, struct json_object_s *final, struct json
       j++;
     }
     finalObjects = finalObjects->next;
+  }
+}
+void handleInterupts() {
+  if (z80.halt) {
   }
 }
