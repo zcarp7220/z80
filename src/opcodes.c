@@ -2,7 +2,14 @@
 #include "z80.h"
 #define LD(B, A) \
   (B = A);       \
-  z80.PC += 2;
+  z80.PC += 1;
+#define HLASINDEX(A)        \
+  temp = z80.HL;            \
+  z80.HL = readMem(z80.HL); \
+  A;                        \
+  writeMem(temp, z80.HL);   \
+  z80.HL = temp;
+int temp;
 void setFlag(int flag) { z80.F |= flag; }
 void clearFlag(int flag) { z80.F &= ~(flag); }
 bool readFlag(int flag) { return z80.F & flag; }
@@ -57,16 +64,8 @@ void checkAndSetZero(int number) {
 }
 
 void setUndocumentedFlags(int result) {
-  if (result & Z80_F3) {
-    setFlag(Z80_F3);
-  } else {
-    clearFlag(Z80_F3);
-  }
-  if (result & Z80_F5) {
-    setFlag(Z80_F5);
-  } else {
-    clearFlag(Z80_F5);
-  }
+  checkSet(Z80_F3, result & Z80_F3);
+  checkSet(Z80_F5, result & Z80_F5);
 }
 
 void checkAndSetPV(int *result, int prev, char PV, char width) {
@@ -219,7 +218,6 @@ void daa() {
   z80.A = afterA;
   z80.PC += 1;
 }
-
 void cpl() {
   setFlag(Z80_NF);
   setFlag(Z80_HF);
@@ -267,7 +265,7 @@ void runOpcode() {
     break;
   case 0x1:
     LD(z80.BC, getVal16());
-    z80.PC += 1;
+    z80.PC += 2;
     break;
   case 0x2:
     writeMem(readMem(z80.BC), z80.A);
@@ -284,6 +282,7 @@ void runOpcode() {
     break;
   case 0x6:
     LD(z80.B, getVal8());
+    z80.PC += 1;
     break;
   case 0x7:
     rotateC('l', &z80.A, 'b');
@@ -296,7 +295,6 @@ void runOpcode() {
     break;
   case 0xA:
     LD(z80.A, readMem(z80.BC));
-    z80.PC -= 1;
     break;
   case 0xB:
     dec16(&z80.BC);
@@ -309,6 +307,7 @@ void runOpcode() {
     break;
   case 0xE:
     LD(z80.C, getVal8());
+    z80.PC += 1;
     break;
   case 0xF:
     rotateC('r', &z80.A, 'b');
@@ -318,7 +317,7 @@ void runOpcode() {
     break;
   case 0x11:
     LD(z80.DE, getVal16());
-    z80.PC += 1;
+    z80.PC += 2;
     break;
   case 0x12:
     writeMem(readMem(z80.DE), z80.A);
@@ -335,6 +334,7 @@ void runOpcode() {
     break;
   case 0x16:
     LD(z80.D, getVal8());
+    z80.PC += 1;
     break;
   case 0x17:
     rotate('l', &z80.A, 'b');
@@ -347,7 +347,6 @@ void runOpcode() {
     break;
   case 0x1A:
     LD(z80.A, readMem(z80.DE));
-    z80.PC -= 1;
     break;
   case 0x1B:
     dec16(&z80.DE);
@@ -360,6 +359,7 @@ void runOpcode() {
     break;
   case 0x1E:
     LD(z80.E, getVal8());
+    z80.PC += 1;
     break;
   case 0x1F:
     rotate('r', &z80.A, 'b');
@@ -369,7 +369,7 @@ void runOpcode() {
     break;
   case 0x21:
     LD(z80.HL, getVal16());
-    z80.PC += 1;
+    z80.PC += 2;
     break;
   case 0x22:
     writeMem(getVal16(), z80.HL);
@@ -386,6 +386,7 @@ void runOpcode() {
     break;
   case 0x26:
     LD(z80.H, getVal8());
+    z80.PC += 1;
     break;
   case 0x27:
     daa();
@@ -398,6 +399,7 @@ void runOpcode() {
     break;
   case 0x2A:
     LD(z80.HL, getValueAtMemory());
+    z80.PC += 1;
     break;
   case 0x2B:
     dec16(&z80.HL);
@@ -410,73 +412,119 @@ void runOpcode() {
     break;
   case 0x2E:
     LD(z80.L, getVal8());
+    z80.PC += 1;
     break;
   case 0x2F:
     cpl();
     break;
   case 0x30:
+    jr(!readFlag(Z80_CF));
     break;
   case 0x31:
+    LD(z80.SP, getVal16());
+    z80.PC += 2;
     break;
   case 0x32:
+    writeMem(getVal16(), z80.A);
+    z80.PC += 3;
     break;
   case 0x33:
+    inc16(&z80.SP);
     break;
   case 0x34:
+    HLASINDEX(inc8(&z80.HL));
     break;
   case 0x35:
+    HLASINDEX(dec8(&z80.HL));
     break;
   case 0x36:
+    HLASINDEX(LD(z80.HL, getVal8()));
+    z80.PC += 1;
     break;
   case 0x37:
+    clearFlag(Z80_NF);
+    clearFlag(Z80_HF);
+    setUndocumentedFlags(z80.A);
+    setFlag(Z80_CF);
+    z80.PC += 1;
     break;
   case 0x38:
+    jr(readFlag(Z80_CF));
     break;
   case 0x39:
+    add(z80.SP, z80.HL, &z80.HL, 'w');
     break;
   case 0x3A:
+    LD(z80.A, getValueAtMemory());
+    z80.PC += 1;
     break;
   case 0x3B:
+    dec16(&z80.SP);
     break;
   case 0x3C:
+    inc8(&z80.A);
     break;
   case 0x3D:
+    dec8(&z80.A);
     break;
   case 0x3E:
+    LD(z80.A, getVal8());
+    z80.PC += 1;
     break;
   case 0x3F:
+    clearFlag(Z80_NF);
+    setUndocumentedFlags(z80.A);
+    checkSet(Z80_HF, readFlag(Z80_CF));
+    checkSet(Z80_CF, !readFlag(Z80_CF));
+    z80.PC += 1;
     break;
   case 0x40:
+    LD(z80.B, z80.B);
     break;
   case 0x41:
+    LD(z80.B, z80.C);
     break;
   case 0x42:
+    LD(z80.B, z80.D);
     break;
   case 0x43:
+    LD(z80.B, z80.E);
     break;
   case 0x44:
+    LD(z80.B, z80.H);
     break;
   case 0x45:
+    LD(z80.B, z80.L);
     break;
   case 0x46:
+    HLASINDEX(LD(z80.B, z80.HL));
     break;
   case 0x47:
+    LD(z80.B, z80.A);
     break;
   case 0x48:
+    LD(z80.C, z80.B);
     break;
   case 0x49:
+    LD(z80.C, z80.C);
     break;
   case 0x4A:
+    LD(z80.C, z80.D);
     break;
   case 0x4B:
+    LD(z80.C, z80.E);
     break;
   case 0x4C:
+    LD(z80.C, z80.H);
     break;
   case 0x4D:
+    LD(z80.C, z80.L);
     break;
   case 0x4E:
+    HLASINDEX(LD(z80.C, z80.HL));
     break;
   case 0x4F:
+    LD(z80.C, z80.A);
     break;
   case 0x50:
     break;
