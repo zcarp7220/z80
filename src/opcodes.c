@@ -14,6 +14,8 @@ int var;
 void setFlag(int flag) { z80.F |= flag; }
 void clearFlag(int flag) { z80.F &= ~(flag); }
 bool readFlag(int flag) { return z80.F & flag; }
+uint8_t pop(){ z80.SP += 1; return readMem(z80.SP - 1); }
+void push(uint8_t A){  z80.SP -= 1; writeMem(z80.SP + 1, A);}
 
 static inline uint16_t getVal16() {
   return readMem(z80.PC + 1) | readMem(z80.PC + 2) << 8;
@@ -119,31 +121,41 @@ static inline void and(int A) {
   checkSet(Z80_PF, getParity(result));
   checkSet(Z80_ZF, (uint8_t)result == 0);
   checkSet(Z80_SF, (result & 0x80) != 0);
+  setUndocumentedFlags(result);
   z80.A = result;
+  z80.PC += 1;
 }
 
 static inline void xor(int A) {
   int result = A ^ z80.A;
   clearFlag(Z80_CF);
   clearFlag(Z80_NF);
-  setFlag(Z80_HF);
+  clearFlag(Z80_HF);
   checkSet(Z80_PF, getParity(result));
   checkSet(Z80_ZF, (uint8_t)result == 0);
   checkSet(Z80_SF, (result & 0x80) != 0);
+  setUndocumentedFlags(result);
   z80.A = result;
+  z80.PC += 1;
 }
 
 static inline void or(int A) {
   int result = A | z80.A;
   clearFlag(Z80_CF);
   clearFlag(Z80_NF);
-  setFlag(Z80_HF);
+  clearFlag(Z80_HF);
   checkSet(Z80_PF, getParity(result));
   checkSet(Z80_ZF, (uint8_t)result == 0);
   checkSet(Z80_SF, (result & 0x80) != 0);
+  setUndocumentedFlags(result);
   z80.A = result;
+  z80.PC += 1;
 }
-
+static inline void cp(int A){
+  uint8_t trash;
+  sub(z80.A, A, &trash, 'b', false);
+  setUndocumentedFlags(A);
+}
 static inline void rotateC(char direction, void *val, char size) {
   int result;
   clearFlag(Z80_HF);
@@ -260,6 +272,14 @@ static inline void dec8(uint8_t *value) {
 static inline void dec16(uint16_t *value) {
   *value -= 1;
   z80.PC += 1;
+}
+void ret(bool input){
+  if(input){
+    printf("0x%X\n", z80.PC);
+    z80.PC = pop() | pop() << 8;
+  }else{
+    z80.PC += 1;
+  }
 }
 
 void runOpcode(uint8_t opcode) {
@@ -773,71 +793,104 @@ void runOpcode(uint8_t opcode) {
   case 0x9F:
     sub(z80.A, z80.A, &z80.A, 'b',readFlag(Z80_CF));
     break;
-  case 0xA0:
+    case 0xA0:
+    and(z80.B);
     break;
   case 0xA1:
+    and(z80.C);
     break;
   case 0xA2:
+    and(z80.D);
     break;
   case 0xA3:
+    and(z80.E);
     break;
   case 0xA4:
+    and(z80.H);
     break;
   case 0xA5:
+    and(z80.L);
     break;
   case 0xA6:
+    HLASINDEX(and(z80.HL));
     break;
   case 0xA7:
+    and(z80.A);
     break;
   case 0xA8:
+    xor(z80.B);
     break;
   case 0xA9:
+    xor(z80.C);
     break;
   case 0xAA:
+    xor(z80.D);
     break;
   case 0xAB:
+    xor(z80.E);
     break;
   case 0xAC:
+    xor(z80.H);
     break;
   case 0xAD:
+    xor(z80.L);
     break;
   case 0xAE:
+    HLASINDEX(xor(z80.HL));
     break;
   case 0xAF:
+    xor(z80.A);
     break;
-  case 0xB0:
+    case 0xB0:
+    or(z80.B);
     break;
   case 0xB1:
+    or(z80.C);
     break;
   case 0xB2:
+    or(z80.D);
     break;
   case 0xB3:
+    or(z80.E);
     break;
   case 0xB4:
+    or(z80.H);
     break;
   case 0xB5:
+    or(z80.L);
     break;
   case 0xB6:
+    HLASINDEX(or(z80.HL));
     break;
   case 0xB7:
+    or(z80.A);
     break;
   case 0xB8:
+    cp(z80.B);
     break;
   case 0xB9:
+    cp(z80.C);
     break;
   case 0xBA:
+    cp(z80.D);
     break;
   case 0xBB:
+    cp(z80.E);
     break;
   case 0xBC:
+    cp(z80.H);
     break;
   case 0xBD:
+    cp(z80.L);
     break;
   case 0xBE:
+    HLASINDEX(cp(z80.HL));
     break;
   case 0xBF:
+    cp(z80.A);
     break;
   case 0xC0:
+    ret(!readFlag(Z80_ZF));
     break;
   case 0xC1:
     break;
