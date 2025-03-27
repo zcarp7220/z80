@@ -2,7 +2,7 @@
 #include "json.h"
 uint8_t ram[0xFFFF];
 inline void writeMem(uint16_t addr, uint8_t data) { ram[addr] = data; }
-inline int readMem(uint16_t addr) { return ram[addr]; }
+inline uint8_t readMem(uint16_t addr) { return ram[addr]; }
 int main(int argc, char *argv[]) {
   if (argv[1] == NULL) {
     printf("Please Enter A File Name\n");
@@ -10,7 +10,8 @@ int main(int argc, char *argv[]) {
   }
   FILE *file = fopen(argv[1], "r");
   if (file == NULL) {
-    printf("File Does Not Exist");
+    printf("File Does Not Exist\n");
+    return 1;
   }
   fseek(file, 0, SEEK_END);
   size_t fileSize = ftell(file);
@@ -22,10 +23,7 @@ int main(int argc, char *argv[]) {
   struct json_value_s *root = json_parse(json, fileSize);
   struct json_array_element_s *myTests = json_value_as_array(root)->start;
   while (myTests->next != NULL) {
-    struct json_object_element_s *currentTest = json_value_as_object(myTests->value)->start->next;
-    struct json_object_s *initalValue = json_value_as_object(currentTest->value);
-    struct json_object_s *expectedFinalValue = json_value_as_object(currentTest->next->value);
-    step(initalValue, expectedFinalValue, json_value_as_string(json_value_as_object(myTests->value)->start->value));
+    step(myTests);
     myTests = myTests->next;
   }
   if (success) {

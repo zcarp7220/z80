@@ -30,13 +30,15 @@ union{struct{uint8_t Fp; uint8_t Ap;};uint16_t AFp; };
 union{struct{uint8_t Cp; uint8_t Bp;};uint16_t BCp; };
 union{struct{uint8_t Ep; uint8_t Dp;};uint16_t DEp; };
 union{struct{uint8_t Lp; uint8_t Hp;};uint16_t HLp; };
-//Speacal Pourpse Registers
+//Speacal Purpose Registers
 uint16_t PC; uint16_t SP; uint16_t IX; 
 uint16_t IY; uint16_t I; uint16_t R;
 bool EI; uint8_t IM; bool IFF1; bool IFF2;  
-//Io Registers
-uint16_t address; uint8_t data; bool readIO; bool writeIO;
+// I/O Registers
+uint16_t address; uint8_t data; bool IOwrite; bool IOread;
 }cpu_t;
 extern cpu_t z80;
 void runOpcode(uint8_t opcode);
 void handleInterupts();
+void bitInstructions(uint16_t opcode);
+void extendedInstructions(uint16_t opcode);

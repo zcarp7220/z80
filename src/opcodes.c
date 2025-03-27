@@ -15,13 +15,19 @@ void setFlag(int flag) { z80.F |= flag; }
 void clearFlag(int flag) { z80.F &= ~(flag); }
 bool readFlag(int flag) { return z80.F & flag; }
 uint8_t pop(){ z80.SP += 1; return readMem(z80.SP - 1); }
-void push(uint8_t A){  z80.SP -= 1; writeMem(z80.SP + 1, A);}
-
-static inline uint16_t getVal16() {
+void push(uint8_t A){  z80.SP -= 1; writeMem(z80.SP, A);}
+void push16(uint16_t A){
+  push(A >> 8);
+  push(A & 0xFF);
+  }
+uint16_t pop16(){
+  return pop() | pop() << 8;
+ }
+static inline uint16_t readNN() {
   return readMem(z80.PC + 1) | readMem(z80.PC + 2) << 8;
 }
 
-static inline uint8_t getVal8() {
+static inline uint8_t readN() {
   return readMem(z80.PC + 1);
 }
 bool getParity(int value) {
@@ -35,52 +41,22 @@ bool getParity(int value) {
   return !out;
 }
 static inline uint16_t getValueAtMemory() {
-  int address = readMem(getVal16()) | readMem(getVal16() + 1) << 8;
+  int address = readMem(readNN()) | readMem(readNN() + 1) << 8;
   z80.PC += 1;
   return address;
 }
 
-static inline void checkSet(int flag, bool conditon) {
-  if (conditon) {
-    setFlag(flag);
-  } else {
-    clearFlag(flag);
-  }
-}
+#define checkSet(flag, conditon) \
+  if (conditon) {\
+    setFlag(flag);\
+  } else {\
+    clearFlag(flag);\
+  }\
 
-void checkAndSetSign(uint32_t number, char size) {
-  if (((number & 0x80) != 0) && (size == 'b')) {
-    setFlag(Z80_SF);
-  } else if (((number & 0x8000) != 0) && (size == 'w')) {
-    setFlag(Z80_SF);
-  } else {
-    clearFlag(Z80_SF);
-  }
-}
-
-void checkAndSetZero(int number) {
-  if ((number == 0)) {
-    setFlag(Z80_ZF);
-  } else {
-    clearFlag(Z80_ZF);
-  }
-}
 
 void setUndocumentedFlags(int result) {
   checkSet(Z80_F3, result & Z80_F3);
   checkSet(Z80_F5, result & Z80_F5);
-}
-
-void checkAndSetPV(int *result, int prev, char PV, char width) {
-  if (width == 'b' && PV == 'v') {
-    if (((prev & 0x80) == 0 && (*result & 0x80) != 0) || ((prev & 0x80) != 0 && (*result & 0x80) == 0)) {
-      setFlag(Z80_PF);
-    } else {
-      clearFlag(Z80_PF);
-    }
-  } else {
-    clearFlag(Z80_PF);
-  }
 }
 
 static inline void add(int A, int B, void *storeLocation, char width, bool carry) {
@@ -212,7 +188,7 @@ void jr(bool condition) {
 void dnjz() {
   z80.B--;
   if (z80.B != 0) {
-    z80.PC += (int8_t)getVal8();
+    z80.PC += (int8_t)readN();
   }
   z80.PC += 2;
 }
@@ -252,9 +228,9 @@ void cpl() {
   z80.PC += 1;
 }
 
-static inline void inc8(uint8_t *value) {
+static inline void inc8(void *value) {
   bool oldCarry = readFlag(Z80_CF);
-  add(*value, 0, value, 'b', true);
+  add(*(uint8_t *)value, 0, value, 'b', true);
   checkSet(Z80_CF, oldCarry);
 }
 
@@ -263,9 +239,9 @@ static inline void inc16(uint16_t *value) {
   z80.PC += 1;
 }
 
-static inline void dec8(uint8_t *value) {
+static inline void dec8(void *value) {
   bool oldCarry = readFlag(Z80_CF);
-  sub(*value, 0, value, 'b', true);
+  sub(*(uint8_t *)value, 0, value, 'b', true);
   checkSet(Z80_CF, oldCarry);
 }
 
@@ -273,26 +249,43 @@ static inline void dec16(uint16_t *value) {
   *value -= 1;
   z80.PC += 1;
 }
+void call(bool input){
+if(input){
+  push16(z80.PC + 3);
+  z80.PC = readNN(); 
+}else{
+  z80.PC += 3;
+}
+}
+void rst(int resetVector){
+push16(z80.PC + 1);
+z80.PC = resetVector;
+}
 void ret(bool input){
   if(input){
-    printf("0x%X\n", z80.PC);
     z80.PC = pop() | pop() << 8;
   }else{
     z80.PC += 1;
   }
 }
-
+void jp(bool input){
+  if(input){
+    z80.PC = readNN();
+  }else{
+    z80.PC += 3;
+  }
+}
 void runOpcode(uint8_t opcode) {
   switch (opcode) {
   case 0x00:
     z80.PC += 1;
     break;
   case 0x01:
-    LD(z80.BC, getVal16());
+    LD(z80.BC, readNN());
     z80.PC += 2;
     break;
   case 0x02:
-    writeMem(readMem(z80.BC), z80.A);
+  writeMem(z80.BC, z80.A);
     z80.PC += 1;
     break;
   case 0x03:
@@ -305,7 +298,7 @@ void runOpcode(uint8_t opcode) {
     dec8(&z80.B);
     break;
   case 0x06:
-    LD(z80.B, getVal8());
+    LD(z80.B, readN());
     z80.PC += 1;
     break;
   case 0x07:
@@ -330,7 +323,7 @@ void runOpcode(uint8_t opcode) {
     dec8(&z80.C);
     break;
   case 0x0E:
-    LD(z80.C, getVal8());
+    LD(z80.C, readN());
     z80.PC += 1;
     break;
   case 0x0F:
@@ -340,11 +333,11 @@ void runOpcode(uint8_t opcode) {
     dnjz();
     break;
   case 0x11:
-    LD(z80.DE, getVal16());
+    LD(z80.DE, readNN());
     z80.PC += 2;
     break;
   case 0x12:
-    writeMem(readMem(z80.DE), z80.A);
+    writeMem(z80.DE, z80.A);
     z80.PC += 1;
     break;
   case 0x13:
@@ -357,7 +350,7 @@ void runOpcode(uint8_t opcode) {
     dec8(&z80.D);
     break;
   case 0x16:
-    LD(z80.D, getVal8());
+    LD(z80.D, readN());
     z80.PC += 1;
     break;
   case 0x17:
@@ -382,7 +375,7 @@ void runOpcode(uint8_t opcode) {
     dec8(&z80.E);
     break;
   case 0x1E:
-    LD(z80.E, getVal8());
+    LD(z80.E, readN());
     z80.PC += 1;
     break;
   case 0x1F:
@@ -392,11 +385,12 @@ void runOpcode(uint8_t opcode) {
     jr(!readFlag(Z80_ZF));
     break;
   case 0x21:
-    LD(z80.HL, getVal16());
+    LD(z80.HL, readNN());
     z80.PC += 2;
     break;
   case 0x22:
-    writeMem(getVal16(), z80.HL);
+    writeMem(readNN(), z80.L);
+    writeMem(readNN() + 1, z80.H);
     z80.PC += 3;
     break;
   case 0x23:
@@ -409,7 +403,7 @@ void runOpcode(uint8_t opcode) {
     dec8(&z80.H);
     break;
   case 0x26:
-    LD(z80.H, getVal8());
+    LD(z80.H, readN());
     z80.PC += 1;
     break;
   case 0x27:
@@ -435,7 +429,7 @@ void runOpcode(uint8_t opcode) {
     dec8(&z80.L);
     break;
   case 0x2E:
-    LD(z80.L, getVal8());
+    LD(z80.L, readN());
     z80.PC += 1;
     break;
   case 0x2F:
@@ -445,11 +439,11 @@ void runOpcode(uint8_t opcode) {
     jr(!readFlag(Z80_CF));
     break;
   case 0x31:
-    LD(z80.SP, getVal16());
+    LD(z80.SP, readNN());
     z80.PC += 2;
     break;
   case 0x32:
-    writeMem(getVal16(), z80.A);
+    writeMem(readNN(), z80.A);
     z80.PC += 3;
     break;
   case 0x33:
@@ -462,7 +456,7 @@ void runOpcode(uint8_t opcode) {
     HLASINDEX(dec8(&z80.HL));
     break;
   case 0x36:
-    HLASINDEX(LD(z80.HL, getVal8()));
+    HLASINDEX(LD(z80.HL, readN()));
     z80.PC += 1;
     break;
   case 0x37:
@@ -492,7 +486,7 @@ void runOpcode(uint8_t opcode) {
     dec8(&z80.A);
     break;
   case 0x3E:
-    LD(z80.A, getVal8());
+    LD(z80.A, readN());
     z80.PC += 1;
     break;
   case 0x3F:
@@ -661,10 +655,12 @@ void runOpcode(uint8_t opcode) {
     HLASINDEX(LD(z80.HL, z80.E));
     break;
   case 0x74:
-    HLASINDEX(LD(z80.HL, z80.H));
+  var = z80.H;
+    HLASINDEX(LD(z80.HL, var));
     break;
   case 0x75:
-    HLASINDEX(LD(z80.HL, z80.L));
+  var = z80.L;
+    HLASINDEX(LD(z80.HL, var));
     break;
   case 0x76:
     z80.halt = true;
@@ -893,38 +889,69 @@ void runOpcode(uint8_t opcode) {
     ret(!readFlag(Z80_ZF));
     break;
   case 0xC1:
+  z80.BC = pop16();
+  z80.PC += 1;
     break;
   case 0xC2:
+  jp(!readFlag(Z80_ZF));
     break;
   case 0xC3:
+  jp(true);
     break;
   case 0xC4:
+  call(!readFlag(Z80_ZF));
     break;
   case 0xC5:
+  push16(z80.BC);
+  z80.PC += 1;
     break;
   case 0xC6:
+  add(z80.A, readN(), &z80.A, 'b', false);
+  z80.PC += 1;
     break;
   case 0xC7:
+    rst(0x0);
     break;
   case 0xC8:
+  ret(readFlag(Z80_ZF));
+    break;
+  case 0xC9:
+    ret(true);
     break;
   case 0xCA:
+  jp(readFlag(Z80_ZF));
+    break;
+  case 0xCB:
+  bitInstructions(readMem(z80.PC + 1));
     break;
   case 0xCC:
+  call(readFlag(Z80_ZF));
     break;
   case 0xCD:
+  call(true);
     break;
   case 0xCE:
+  add(z80.A, readN(), &z80.A, 'b', readFlag(Z80_CF));
+  z80.PC += 1;
     break;
   case 0xCF:
+  rst(0x08);
     break;
   case 0xD0:
+  ret(!readFlag(Z80_CF));
     break;
   case 0xD1:
+  z80.DE = pop16();
+  z80.PC += 1;
     break;
   case 0xD2:
+  jp(!readFlag(Z80_CF));
     break;
   case 0xD3:
+  z80.data = z80.A;
+  z80.address = z80.A << 8 | readN();
+  z80.IOwrite = true;
+  z80.PC += 2;
     break;
   case 0xD4:
     break;
@@ -1018,4 +1045,10 @@ void runOpcode(uint8_t opcode) {
   } else {
     z80.R++;
   }
+}
+void bitInstructions(uint16_t opcode){
+printf("AHHHH!! I dont know how to handle: 0x%X\n", opcode);
+}
+void extendedInstructions(uint16_t opcode){
+  printf("**SCREAM** I cant beleve that you gave me something i dont know (yet): 0x%X\n", opcode);
 }
