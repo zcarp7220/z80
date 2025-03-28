@@ -132,11 +132,10 @@ static inline void cp(int A){
   sub(z80.A, A, &trash, 'b', false);
   setUndocumentedFlags(A);
 }
-static inline void rotateC(char direction, void *val, char size) {
+static inline void rotateC(char direction, void *val) {
   int result;
   clearFlag(Z80_HF);
   clearFlag(Z80_NF);
-  if (size == 'b') {
     if (direction == 'l') {
       result = (*(uint8_t *)val << 1) | (*(uint8_t *)val >> 7);
       checkSet(Z80_CF, (result & 1) != 0);
@@ -148,14 +147,12 @@ static inline void rotateC(char direction, void *val, char size) {
     setUndocumentedFlags(result);
     *(uint8_t *)val = result;
     z80.PC += 1;
-  }
 }
 
-static inline void rotate(char direction, void *val, char size) {
+static inline void rotate(char direction, void *val) {
   int result;
   clearFlag(Z80_HF);
   clearFlag(Z80_NF);
-  if (size == 'b') {
     uint8_t value = *(uint8_t *)val;
     if (direction == 'l') {
       result = (value << 1) | (value >> 8) | readFlag(Z80_CF);
@@ -167,7 +164,6 @@ static inline void rotate(char direction, void *val, char size) {
     setUndocumentedFlags(result);
     *(uint8_t *)val = result;
     z80.PC += 1;
-  }
 }
 
 static inline void exchangeRegisters(uint16_t *A, uint16_t *B) {
@@ -302,7 +298,7 @@ void runOpcode(uint8_t opcode) {
     z80.PC += 1;
     break;
   case 0x07:
-    rotateC('l', &z80.A, 'b');
+    rotateC('l', &z80.A);
     break;
   case 0x08:
     exchangeRegisters(&z80.AF, &z80.AFp);
@@ -327,7 +323,7 @@ void runOpcode(uint8_t opcode) {
     z80.PC += 1;
     break;
   case 0x0F:
-    rotateC('r', &z80.A, 'b');
+    rotateC('r', &z80.A);
     break;
   case 0x10:
     dnjz();
@@ -354,7 +350,7 @@ void runOpcode(uint8_t opcode) {
     z80.PC += 1;
     break;
   case 0x17:
-    rotate('l', &z80.A, 'b');
+    rotate('l', &z80.A);
     break;
   case 0x18:
     jr(true);
@@ -379,7 +375,7 @@ void runOpcode(uint8_t opcode) {
     z80.PC += 1;
     break;
   case 0x1F:
-    rotate('r', &z80.A, 'b');
+    rotate('r', &z80.A);
     break;
   case 0x20:
     jr(!readFlag(Z80_ZF));
