@@ -22,7 +22,7 @@ void step(struct json_array_element_s *myTests) {
   struct json_object_s *expectedFinalValue = json_value_as_object(currentTest->next->value);
   struct json_string_s *name = json_value_as_string(json_value_as_object(myTests->value)->start->value);
   struct json_array_s *expectedPorts = NULL;
-  if(currentTest->next->next->next != NULL){
+  if (currentTest->next->next->next != NULL) {
     expectedPorts = json_value_as_array(currentTest->next->next->next->value);
   }
   struct objects {
@@ -155,34 +155,33 @@ void step(struct json_array_element_s *myTests) {
     }
     ramCheckIndex++;
   }
-  if(expectedPorts == NULL){
-   return;
+  if (expectedPorts == NULL) {
+    return;
   }
   struct json_array_s *finalPortValues = json_value_as_array(expectedPorts->start->value);
-  if(finalPortValues == NULL){
+  if (finalPortValues == NULL) {
     printf("GAH!");
   }
   int address = atoi(json_value_as_number(finalPortValues->start->value)->number);
   int data = atoi(json_value_as_number(finalPortValues->start->next->value)->number);
   char readWrite[10];
   strncpy(readWrite, json_value_as_string(finalPortValues->start->next->next->value)->string, sizeof(readWrite) - 1)[sizeof(readWrite) - 1] = '\0';
-  if(!strcmp(readWrite, "w") && !z80.IOwrite){
-    printf("Fail: Expected value for the I/O write is %s, Actual value for I/O write is  %s on test %s\n", readWrite,  z80.IOwrite ? "Write" : "NIL", name->string);
-    exit(0);  
+  if (!strcmp(readWrite, "w") && !z80.IOwrite) {
+    printf("Fail: Expected value for the I/O write is %s, Actual value for I/O write is  %s on test %s\n", readWrite, z80.IOwrite ? "Write" : "NIL", name->string);
+    exit(0);
   }
-  if(!strcmp(readWrite, "b") && !z80.IOread){
-    printf("Fail: Expected value for the I/O read is %s, Actual value for I/O read is %s on test %s\n", readWrite,  z80.IOread ? "Write" : "NIL", name->string);
-    exit(0);  
+  if (!strcmp(readWrite, "b") && !z80.IOread) {
+    printf("Fail: Expected value for the I/O read is %s, Actual value for I/O read is %s on test %s\n", readWrite, z80.IOread ? "Write" : "NIL", name->string);
+    exit(0);
   }
-  if(address != z80.address){
+  if (address != z80.address) {
     printf("Fail: Expected value for the address is 0x%X, Actual value for address is 0x%X on test %s\n", address, z80.address, name->string);
     exit(0);
   }
-  if(data != z80.data){
+  if (data != z80.data) {
     printf("Fail: Expected value for the data is 0x%X, Actual value for data is 0x%X on test %s\n", data, z80.data, name->string);
     exit(0);
   }
-
 }
 void handleInterupts() {
   if (z80.halt) {
