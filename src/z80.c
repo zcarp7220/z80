@@ -77,6 +77,7 @@ void step(struct json_array_element_s *myTests) {
     writeMem(address, value);
     i++;
   }
+
   // Da Meat
   handleInterupts();
   if (!z80.halt) {
@@ -84,6 +85,7 @@ void step(struct json_array_element_s *myTests) {
   } else {
     runOpcode(0x0);
   }
+
   struct json_object_element_s *finalObjects = expectedFinalValue->start;
   int actual = 0;
   struct objects finalRegisters[] = {

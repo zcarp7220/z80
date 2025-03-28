@@ -143,7 +143,9 @@ static inline void rotateC(char direction, void *val) {
       result = (*(uint8_t *)val >> 1) | (*(uint8_t *)val << 7);
       checkSet(Z80_CF, (result & 0x80) != 0);
     }
-
+    checkSet(Z80_PF, getParity(result));
+    checkSet(Z80_ZF, (uint8_t)result == 0);
+    checkSet(Z80_SF, (result & 0x80) != 0);
     setUndocumentedFlags(result);
     *(uint8_t *)val = result;
     z80.PC += 1;
@@ -162,10 +164,77 @@ static inline void rotate(char direction, void *val) {
       checkSet(Z80_CF, (value & 0x1) != 0);
     }
     setUndocumentedFlags(result);
+    checkSet(Z80_PF, getParity(result));
+    checkSet(Z80_ZF, (uint8_t)result == 0);
+    checkSet(Z80_SF, (result & 0x80) != 0);
     *(uint8_t *)val = result;
     z80.PC += 1;
 }
 
+static inline void shift(char direction, void *val) {
+  int result;
+  clearFlag(Z80_HF);
+  clearFlag(Z80_NF);
+    uint8_t value = *(uint8_t *)val;
+    if (direction == 'l') {
+      result = value << 1;
+      checkSet(Z80_CF, result & 0x100);
+    } else if (direction == 'r') {
+      result = value >> 1;
+      result |= value & 0x80;
+      checkSet(Z80_CF, (value & 0x1) != 0);
+    }
+    setUndocumentedFlags(result);
+    checkSet(Z80_PF, getParity(result));
+    checkSet(Z80_ZF, (uint8_t)result == 0);
+    checkSet(Z80_SF, (result & 0x80) != 0);
+    *(uint8_t *)val = result;
+    z80.PC += 1;
+}
+
+static inline void logicalShift(char direction, void *val) {
+  int result;
+  clearFlag(Z80_HF);
+  clearFlag(Z80_NF);
+    uint8_t value = *(uint8_t *)val;
+    if (direction == 'l') {
+      result = value << 1;
+      result |= 0x1;
+      checkSet(Z80_CF, result & 0x100);
+    } else if (direction == 'r') {
+      result = value >> 1;
+      result &= ~0x80;
+      checkSet(Z80_CF, (value & 0x1) != 0);
+    }
+    setUndocumentedFlags(result);
+    checkSet(Z80_PF, getParity(result));
+    checkSet(Z80_ZF, (uint8_t)result == 0);
+    checkSet(Z80_SF, (result & 0x80) != 0);
+    *(uint8_t *)val = result;
+    z80.PC += 1;
+}
+static inline void bit(int pos, void *var){
+  uint8_t value = *(uint8_t *)var;
+  int result = value & (1<<(pos));
+  clearFlag(Z80_NF);
+  setFlag(Z80_HF);
+  checkSet(Z80_ZF , !result);
+  checkSet(Z80_PF, !result);
+  checkSet(Z80_SF, result & Z80_SF);
+  checkSet(Z80_F3, value & Z80_F3);
+  checkSet(Z80_F5, value & Z80_F5);
+  z80.PC += 1;
+}
+
+static inline void set(int pos, void *var){
+  *(uint8_t *)var |= (1 << pos);  
+  z80.PC += 1;
+}
+
+static inline void reset(int pos, void *var){
+  *(uint8_t *)var &= ~(1 << pos);
+  z80.PC += 1;
+}
 static inline void exchangeRegisters(uint16_t *A, uint16_t *B) {
   uint16_t temp;
   temp = *B;
@@ -918,7 +987,8 @@ void runOpcode(uint8_t opcode) {
   jp(readFlag(Z80_ZF));
     break;
   case 0xCB:
-  bitInstructions(readMem(z80.PC + 1));
+  z80.PC += 1;
+  bitInstructions(readMem(z80.PC));
     break;
   case 0xCC:
   call(readFlag(Z80_ZF));
@@ -1043,7 +1113,782 @@ void runOpcode(uint8_t opcode) {
   }
 }
 void bitInstructions(uint16_t opcode){
-printf("AHHHH!! I dont know how to handle: 0x%X\n", opcode);
+  switch(opcode){
+    case 0x0:
+      rotateC('l',&z80.B);
+      break;
+    case 0x1:
+      rotateC('l',&z80.C);
+      break;
+    case 0x2:
+      rotateC('l',&z80.D);
+      break;
+    case 0x3:
+      rotateC('l',&z80.E);
+      break;
+    case 0x4:
+      rotateC('l',&z80.H);
+      break;
+    case 0x5:
+      rotateC('l',&z80.L);
+      break;
+    case 0x6:
+      HLASINDEX(rotateC('l',&z80.HL));
+      break;
+    case 0x7:
+      rotateC('l',&z80.A);
+      break;
+    case 0x8:
+      rotateC('r',&z80.B);
+      break;
+    case 0x9:
+      rotateC('r',&z80.C);
+      break;
+    case 0xa:
+      rotateC('r',&z80.D);
+      break;
+    case 0xb:
+      rotateC('r',&z80.E);
+      break;
+    case 0xc:
+      rotateC('r',&z80.H);
+      break;
+    case 0xd:
+      rotateC('r',&z80.L);
+      break;
+    case 0xe:
+      HLASINDEX(rotateC('r',&z80.HL));
+      break;
+    case 0xf:
+      rotateC('r',&z80.A);
+      break;
+    case 0x10:
+      rotate('l',&z80.B);
+      break;
+    case 0x11:
+      rotate('l',&z80.C);
+      break;
+    case 0x12:
+      rotate('l',&z80.D);
+      break;
+    case 0x13:
+      rotate('l',&z80.E);
+      break;
+    case 0x14:
+      rotate('l',&z80.H);
+      break;
+    case 0x15:
+      rotate('l',&z80.L);
+      break;
+    case 0x16:
+      HLASINDEX(rotate('l',&z80.HL));
+      break;
+    case 0x17:
+      rotate('l',&z80.A);
+      break;
+    case 0x18:
+      rotate('r',&z80.B);
+      break;
+    case 0x19:
+      rotate('r',&z80.C);
+      break;
+    case 0x1a:
+      rotate('r',&z80.D);
+      break;
+    case 0x1b:
+      rotate('r',&z80.E);
+      break;
+    case 0x1c:
+      rotate('r',&z80.H);
+      break;
+    case 0x1d:
+      rotate('r',&z80.L);
+      break;
+    case 0x1e:
+      HLASINDEX(rotate('r',&z80.HL));
+      break;
+    case 0x1f:
+      rotate('r',&z80.A);
+      break;
+    case 0x20:
+      shift('l', &z80.B);
+      break;
+    case 0x21:
+      shift('l', &z80.C);
+      break;
+    case 0x22:
+      shift('l', &z80.D);
+      break;
+    case 0x23:
+      shift('l', &z80.E);
+      break;
+    case 0x24:
+      shift('l', &z80.H);
+      break;
+    case 0x25:
+      shift('l', &z80.L);
+      break;
+    case 0x26:
+      HLASINDEX(shift('l', &z80.HL));
+      break;
+    case 0x27:
+      shift('l', &z80.A);
+      break;
+    case 0x28:
+      shift('r', &z80.B);
+      break;
+    case 0x29:
+      shift('r', &z80.C);
+      break;
+    case 0x2a:
+      shift('r', &z80.D);
+      break;
+    case 0x2b:
+      shift('r', &z80.E);
+      break;
+    case 0x2c:
+      shift('r', &z80.H);
+      break;
+    case 0x2d:
+      shift('r', &z80.L);
+      break;
+    case 0x2e:
+      HLASINDEX(shift('r', &z80.HL));
+      break;
+    case 0x2f:
+      shift('r', &z80.A);
+      break;
+    case 0x30:
+      logicalShift('l', &z80.B);
+      break;
+    case 0x31:
+      logicalShift('l', &z80.C);
+      break;
+    case 0x32:
+      logicalShift('l', &z80.D);
+      break;
+    case 0x33:
+      logicalShift('l', &z80.E);
+      break;
+    case 0x34:
+      logicalShift('l', &z80.H);
+      break;
+    case 0x35:
+      logicalShift('l', &z80.L);
+      break;
+    case 0x36:
+      HLASINDEX(logicalShift('l', &z80.HL));
+      break;
+    case 0x37:
+      logicalShift('l', &z80.A);
+      break;
+    case 0x38:
+      logicalShift('r', &z80.B);
+      break;
+    case 0x39:
+      logicalShift('r', &z80.C);
+      break;
+    case 0x3a:
+      logicalShift('r', &z80.D);
+      break;
+    case 0x3b:
+      logicalShift('r', &z80.E);
+      break;
+    case 0x3c:
+      logicalShift('r', &z80.H);
+      break;
+    case 0x3d:
+      logicalShift('r', &z80.L);
+      break;
+    case 0x3e:
+      HLASINDEX(logicalShift('r', &z80.HL));
+      break;
+    case 0x3f:
+      logicalShift('r', &z80.A);
+      break;
+    case 0x40:
+      bit(0, &z80.B);
+      break;
+    case 0x41:
+      bit(0, &z80.C);
+      break;
+    case 0x42:
+      bit(0, &z80.D);
+      break;
+    case 0x43:
+      bit(0, &z80.E);
+      break;
+    case 0x44:
+      bit(0, &z80.H);
+      break;
+    case 0x45:
+      bit(0, &z80.L);
+      break;
+    case 0x46:
+      HLASINDEX(bit(0, &z80.HL));
+      break;
+    case 0x47:
+      bit(0, &z80.A);
+      break;
+    case 0x48:
+      bit(1, &z80.B);
+      break;
+    case 0x49:
+      bit(1, &z80.C);
+      break;
+    case 0x4a:
+      bit(1, &z80.D);
+      break;
+    case 0x4b:
+      bit(1, &z80.E);
+      break;
+    case 0x4c:
+      bit(1, &z80.H);
+      break;
+    case 0x4d:
+      bit(1, &z80.L);
+      break;
+    case 0x4e:
+      HLASINDEX(bit(1, &z80.HL));
+      break;
+    case 0x4f:
+      bit(1, &z80.A);
+      break;
+    case 0x50:
+      bit(2, &z80.B);
+      break;
+    case 0x51:
+      bit(2, &z80.C);
+      break;
+    case 0x52:
+      bit(2, &z80.D);
+      break;
+    case 0x53:
+      bit(2, &z80.E);
+      break;
+    case 0x54:
+      bit(2, &z80.H);
+      break;
+    case 0x55:
+      bit(2, &z80.L);
+      break;
+    case 0x56:
+      HLASINDEX(bit(2, &z80.HL));
+      break;
+    case 0x57:
+      bit(2, &z80.A);
+      break;
+    case 0x58:
+      bit(3, &z80.B);
+      break;
+    case 0x59:
+      bit(3, &z80.C);
+      break;
+    case 0x5a:
+      bit(3, &z80.D);
+      break;
+    case 0x5b:
+      bit(3, &z80.E);
+      break;
+    case 0x5c:
+      bit(3, &z80.H);
+      break;
+    case 0x5d:
+      bit(3, &z80.L);
+      break;
+    case 0x5e:
+      HLASINDEX(bit(3, &z80.HL));
+      break;
+    case 0x5f:
+      bit(3, &z80.A);
+      break;
+    case 0x60:
+      bit(4, &z80.B);
+      break;
+    case 0x61:
+      bit(4, &z80.C);
+      break;
+    case 0x62:
+      bit(4, &z80.D);
+      break;
+    case 0x63:
+      bit(4, &z80.E);
+      break;
+    case 0x64:
+      bit(4, &z80.H);
+      break;
+    case 0x65:
+      bit(4, &z80.L);
+      break;
+    case 0x66:
+      HLASINDEX(bit(4, &z80.HL));
+      break;
+    case 0x67:
+      bit(4, &z80.A);
+      break;
+    case 0x68:
+      bit(5, &z80.B);
+      break;
+    case 0x69:
+      bit(5, &z80.C);
+      break;
+    case 0x6a:
+      bit(5, &z80.D);
+      break;
+    case 0x6b:
+      bit(5, &z80.E);
+      break;
+    case 0x6c:
+      bit(5, &z80.H);
+      break;
+    case 0x6d:
+      bit(5, &z80.L);
+      break;
+    case 0x6e:
+      HLASINDEX(bit(5, &z80.HL));
+      break;
+    case 0x6f:
+      bit(5, &z80.A);
+      break;
+    case 0x70:
+      bit(6, &z80.B);
+      break;
+    case 0x71:
+      bit(6, &z80.C);
+      break;
+    case 0x72:
+      bit(6, &z80.D);
+      break;
+    case 0x73:
+      bit(6, &z80.E);
+      break;
+    case 0x74:
+      bit(6, &z80.H);
+      break;
+    case 0x75:
+      bit(6, &z80.L);
+      break;
+    case 0x76:
+      HLASINDEX(bit(6, &z80.HL));
+      break;
+    case 0x77:
+      bit(6, &z80.A);
+      break;
+    case 0x78:
+      bit(7, &z80.B);
+      break;
+    case 0x79:
+      bit(7, &z80.C);
+      break;
+    case 0x7a:
+      bit(7, &z80.D);
+      break;
+    case 0x7b:
+      bit(7, &z80.E);
+      break;
+    case 0x7c:
+      bit(7, &z80.H);
+      break;
+    case 0x7d:
+      bit(7, &z80.L);
+      break;
+    case 0x7e:
+      HLASINDEX(bit(7, &z80.HL));
+      break;
+    case 0x7f:
+      bit(7, &z80.A);
+      break;
+    case 0x80:
+      reset(0, &z80.B);
+      break;
+    case 0x81:
+      reset(0, &z80.C);
+      break;
+    case 0x82:
+      reset(0, &z80.D);
+      break;
+    case 0x83:
+      reset(0, &z80.E);
+      break;
+    case 0x84:
+      reset(0, &z80.H);
+      break;
+    case 0x85:
+      reset(0, &z80.L);
+      break;
+    case 0x86:
+      HLASINDEX(reset(0, &z80.HL));
+      break;
+    case 0x87:
+      reset(0, &z80.A);
+      break;
+    case 0x88:
+      reset(1, &z80.B);
+      break;
+    case 0x89:
+      reset(1, &z80.C);
+      break;
+    case 0x8a:
+      reset(1, &z80.D);
+      break;
+    case 0x8b:
+      reset(1, &z80.E);
+      break;
+    case 0x8c:
+      reset(1, &z80.H);
+      break;
+    case 0x8d:
+      reset(1, &z80.L);
+      break;
+    case 0x8e:
+      HLASINDEX(reset(1, &z80.HL));
+      break;
+    case 0x8f:
+      reset(1, &z80.A);
+      break;
+    case 0x90:
+      reset(2, &z80.B);
+      break;
+    case 0x91:
+      reset(2, &z80.C);
+      break;
+    case 0x92:
+      reset(2, &z80.D);
+      break;
+    case 0x93:
+      reset(2, &z80.E);
+      break;
+    case 0x94:
+      reset(2, &z80.H);
+      break;
+    case 0x95:
+      reset(2, &z80.L);
+      break;
+    case 0x96:
+      HLASINDEX(reset(2, &z80.HL));
+      break;
+    case 0x97:
+      reset(2, &z80.A);
+      break;
+    case 0x98:
+      reset(3, &z80.B);
+      break;
+    case 0x99:
+      reset(3, &z80.C);
+      break;
+    case 0x9a:
+      reset(3, &z80.D);
+      break;
+    case 0x9b:
+      reset(3, &z80.E);
+      break;
+    case 0x9c:
+      reset(3, &z80.H);
+      break;
+    case 0x9d:
+      reset(3, &z80.L);
+      break;
+    case 0x9e:
+      HLASINDEX(reset(3, &z80.HL));
+      break;
+    case 0x9f:
+      reset(3, &z80.A);
+      break;
+    case 0xa0:
+      reset(4, &z80.B);
+      break;
+    case 0xa1:
+      reset(4, &z80.C);
+      break;
+    case 0xa2:
+      reset(4, &z80.D);
+      break;
+    case 0xa3:
+      reset(4, &z80.E);
+      break;
+    case 0xa4:
+      reset(4, &z80.H);
+      break;
+    case 0xa5:
+      reset(4, &z80.L);
+      break;
+    case 0xa6:
+      HLASINDEX(reset(4, &z80.HL));
+      break;
+    case 0xa7:
+      reset(4, &z80.A);
+      break;
+    case 0xa8:
+      reset(5, &z80.B);
+      break;
+    case 0xa9:
+      reset(5, &z80.C);
+      break;
+    case 0xaa:
+      reset(5, &z80.D);
+      break;
+    case 0xab:
+      reset(5, &z80.E);
+      break;
+    case 0xac:
+      reset(5, &z80.H);
+      break;
+    case 0xad:
+      reset(5, &z80.L);
+      break;
+    case 0xae:
+      HLASINDEX(reset(5, &z80.HL));
+      break;
+    case 0xaf:
+      reset(5, &z80.A);
+      break;
+    case 0xb0:
+      reset(6, &z80.B);
+      break;
+    case 0xb1:
+      reset(6, &z80.C);
+      break;
+    case 0xb2:
+      reset(6, &z80.D);
+      break;
+    case 0xb3:
+      reset(6, &z80.E);
+      break;
+    case 0xb4:
+      reset(6, &z80.H);
+      break;
+    case 0xb5:
+      reset(6, &z80.L);
+      break;
+    case 0xb6:
+      HLASINDEX(reset(6, &z80.HL));
+      break;
+    case 0xb7:
+      reset(6, &z80.A);
+      break;
+    case 0xb8:
+      reset(7, &z80.B);
+      break;
+    case 0xb9:
+      reset(7, &z80.C);
+      break;
+    case 0xba:
+      reset(7, &z80.D);
+      break;
+    case 0xbb:
+      reset(7, &z80.E);
+      break;
+    case 0xbc:
+      reset(7, &z80.H);
+      break;
+    case 0xbd:
+      reset(7, &z80.L);
+      break;
+    case 0xbe:
+      HLASINDEX(reset(7, &z80.HL));
+      break;
+    case 0xbf:
+      reset(7, &z80.A);
+      break;
+    case 0xc0:
+      set(0, &z80.B);
+      break;
+    case 0xc1:
+      set(0, &z80.C);
+      break;
+    case 0xc2:
+      set(0, &z80.D);
+      break;
+    case 0xc3:
+      set(0, &z80.E);
+      break;
+    case 0xc4:
+      set(0, &z80.H);
+      break;
+    case 0xc5:
+      set(0, &z80.L);
+      break;
+    case 0xc6:
+      HLASINDEX(set(0, &z80.HL));
+      break;
+    case 0xc7:
+      set(0, &z80.A);
+      break;
+    case 0xc8:
+      set(1, &z80.B);
+      break;
+    case 0xc9:
+      set(1, &z80.C);
+      break;
+    case 0xca:
+      set(1, &z80.D);
+      break;
+    case 0xcb:
+      set(1, &z80.E);
+      break;
+    case 0xcc:
+      set(1, &z80.H);
+      break;
+    case 0xcd:
+      set(1, &z80.L);
+      break;
+    case 0xce:
+      HLASINDEX(set(1, &z80.HL));
+      break;
+    case 0xcf:
+      set(1, &z80.A);
+      break;
+    case 0xd0:
+      set(2, &z80.B);
+      break;
+    case 0xd1:
+      set(2, &z80.C);
+      break;
+    case 0xd2:
+      set(2, &z80.D);
+      break;
+    case 0xd3:
+      set(2, &z80.E);
+      break;
+    case 0xd4:
+      set(2, &z80.H);
+      break;
+    case 0xd5:
+      set(2, &z80.L);
+      break;
+    case 0xd6:
+      HLASINDEX(set(2, &z80.HL));
+      break;
+    case 0xd7:
+      set(2, &z80.A);
+      break;
+    case 0xd8:
+      set(3, &z80.B);
+      break;
+    case 0xd9:
+      set(3, &z80.C);
+      break;
+    case 0xda:
+      set(3, &z80.D);
+      break;
+    case 0xdb:
+      set(3, &z80.E);
+      break;
+    case 0xdc:
+      set(3, &z80.H);
+      break;
+    case 0xdd:
+      set(3, &z80.L);
+      break;
+    case 0xde:
+      HLASINDEX(set(3, &z80.HL));
+      break;
+    case 0xdf:
+      set(3, &z80.A);
+      break;
+    case 0xe0:
+      set(4, &z80.B);
+      break;
+    case 0xe1:
+      set(4, &z80.C);
+      break;
+    case 0xe2:
+      set(4, &z80.D);
+      break;
+    case 0xe3:
+      set(4, &z80.E);
+      break;
+    case 0xe4:
+      set(4, &z80.H);
+      break;
+    case 0xe5:
+      set(4, &z80.L);
+      break;
+    case 0xe6:
+      HLASINDEX(set(4, &z80.HL));
+      break;
+    case 0xe7:
+      set(4, &z80.A);
+      break;
+    case 0xe8:
+      set(5, &z80.B);
+      break;
+    case 0xe9:
+      set(5, &z80.C);
+      break;
+    case 0xea:
+      set(5, &z80.D);
+      break;
+    case 0xeb:
+      set(5, &z80.E);
+      break;
+    case 0xec:
+      set(5, &z80.H);
+      break;
+    case 0xed:
+      set(5, &z80.L);
+      break;
+    case 0xee:
+      HLASINDEX(set(5, &z80.HL));
+      break;
+    case 0xef:
+      set(5, &z80.A);
+      break;
+    case 0xf0:
+      set(6, &z80.B);
+      break;
+    case 0xf1:
+      set(6, &z80.C);
+      break;
+    case 0xf2:
+      set(6, &z80.D);
+      break;
+    case 0xf3:
+      set(6, &z80.E);
+      break;
+    case 0xf4:
+      set(6, &z80.H);
+      break;
+    case 0xf5:
+      set(6, &z80.L);
+      break;
+    case 0xf6:
+      HLASINDEX(set(6, &z80.HL));
+      break;
+    case 0xf7:
+      set(6, &z80.A);
+      break;
+    case 0xf8:
+      set(7, &z80.B);
+      break;
+    case 0xf9:
+      set(7, &z80.C);
+      break;
+    case 0xfa:
+      set(7, &z80.D);
+      break;
+    case 0xfb:
+      set(7, &z80.E);
+      break;
+    case 0xfc:
+      set(7, &z80.H);
+      break;
+    case 0xfd:
+      set(7, &z80.L);
+      break;
+    case 0xfe:
+      HLASINDEX(set(7, &z80.HL));
+      break;
+    case 0xff:
+      set(7, &z80.A);
+      break;
+  }
+
+  if (z80.R + 1 == 0x80) {
+    z80.R = 0;
+  } else {
+    z80.R++;
+  }
 }
 void extendedInstructions(uint16_t opcode){
   printf("**SCREAM** I cant beleve that you gave me something i dont know (yet): 0x%X\n", opcode);
