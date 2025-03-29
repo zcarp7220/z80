@@ -2,3 +2,4 @@ src/*.o
 rom/
 build/
 .vscode
+.ccls-cache
