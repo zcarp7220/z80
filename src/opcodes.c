@@ -3,15 +3,33 @@
 #define LD(B, A) \
   (B = A);       \
   z80.PC += 1;
-#define HLASINDEX(A)        \
-  temp = z80.HL;            \
-  z80.HL = readMem(z80.HL); \
-  A;                        \
-  writeMem(temp, z80.HL);   \
-  z80.HL = temp;
-int temp;
-int var;
-bool oldParity, oldSign, oldZero;
+#define HLASINDEX(A)                     \
+  var = z80.HL;                          \
+  if (isHL_IX_IY) {                      \
+    temp = z80.HL + (int8_t)displacment; \
+    z80.PC += 1;                         \
+  } else {                               \
+    temp = z80.HL;                       \
+  }                                      \
+  z80.HL = readMem(temp);                \
+  A;                                     \
+  writeMem(temp, z80.HL);                \
+  z80.HL = var;
+int temp, var, hlStorage, displacment;
+bool oldParity, oldSign, oldZero, isHL_IX_IY;
+void cpuStep() {
+  handleInterupts();
+  if (!z80.halt) {
+    runOpcode(readMem(z80.PC));
+  } else {
+    runOpcode(0x0);
+  }
+}
+void handleInterupts() {
+  if (z80.halt && (z80.NMI || z80.MI)) {
+    z80.halt = false;
+  }
+}
 void setFlag(int flag) { z80.F |= flag; }
 void clearFlag(int flag) { z80.F &= ~(flag); }
 bool readFlag(int flag) { return z80.F & flag; }
@@ -140,7 +158,7 @@ static inline void cp(int A) {
   setUndocumentedFlags(A);
 }
 static inline void rotateC(char direction, void *val) {
-  int result;
+  int result = 0;
   clearFlag(Z80_HF);
   clearFlag(Z80_NF);
   if (direction == 'l') {
@@ -159,7 +177,7 @@ static inline void rotateC(char direction, void *val) {
 }
 static inline void rc_a(char direction) {
   uint8_t *val = &z80.A;
-  int result;
+  int result = 0;
   clearFlag(Z80_HF);
   clearFlag(Z80_NF);
   if (direction == 'l') {
@@ -174,7 +192,7 @@ static inline void rc_a(char direction) {
   z80.PC += 1;
 }
 static inline void rotate(char direction, void *val) {
-  int result;
+  int result = 0;
   clearFlag(Z80_HF);
   clearFlag(Z80_NF);
   uint8_t value = *(uint8_t *)val;
@@ -194,7 +212,7 @@ static inline void rotate(char direction, void *val) {
 }
 static inline void r_a(char direction) {
   uint8_t *val = &z80.A;
-  int result;
+  int result = 0;
   clearFlag(Z80_HF);
   clearFlag(Z80_NF);
   uint8_t value = *(uint8_t *)val;
@@ -210,7 +228,7 @@ static inline void r_a(char direction) {
   z80.PC += 1;
 }
 static inline void shift(char direction, void *val) {
-  int result;
+  int result = 0;
   clearFlag(Z80_HF);
   clearFlag(Z80_NF);
   uint8_t value = *(uint8_t *)val;
@@ -231,7 +249,7 @@ static inline void shift(char direction, void *val) {
 }
 
 static inline void logicalShift(char direction, void *val) {
-  int result;
+  int result = 0;
   clearFlag(Z80_HF);
   clearFlag(Z80_NF);
   uint8_t value = *(uint8_t *)val;
@@ -716,6 +734,7 @@ void runOpcode(uint8_t opcode) {
   case 0x66:
     HLASINDEX(LD(var, z80.HL));
     z80.H = var;
+    hlStorage = (hlStorage & 0xFF) | (var << 8);
     break;
   case 0x67:
     LD(z80.H, z80.A);
@@ -741,6 +760,7 @@ void runOpcode(uint8_t opcode) {
   case 0x6E:
     HLASINDEX(LD(var, z80.HL));
     z80.L = var;
+    hlStorage = (hlStorage & 0xFF00) | var;
     break;
   case 0x6F:
     LD(z80.L, z80.A);
@@ -759,10 +779,12 @@ void runOpcode(uint8_t opcode) {
     break;
   case 0x74:
     var = z80.H;
+    hlStorage = (hlStorage & 0xFF) | (var << 8);
     HLASINDEX(LD(z80.HL, var));
     break;
   case 0x75:
     var = z80.L;
+    hlStorage = (hlStorage & 0xFF00) | var;
     HLASINDEX(LD(z80.HL, var));
     break;
   case 0x76:
@@ -1090,6 +1112,17 @@ void runOpcode(uint8_t opcode) {
     call(readFlag(Z80_CF));
     break;
   case 0xDD:
+    isHL_IX_IY = true;
+    hlStorage = z80.HL;
+    z80.HL = z80.IX;
+    z80.PC += 1;
+    displacment = readMem(z80.PC + 1);
+    if (readMem(z80.PC) != 0xCB) {
+      runOpcode(readMem(z80.PC));
+    }
+    z80.IX = z80.HL;
+    z80.HL = hlStorage;
+    isHL_IX_IY = false;
     break;
   case 0xDE:
     sub(z80.A, readN(), &z80.A, 'b', readFlag(Z80_CF));
@@ -1201,6 +1234,18 @@ void runOpcode(uint8_t opcode) {
     call(readFlag(Z80_SF));
     break;
   case 0xFD:
+    isHL_IX_IY = true;
+    hlStorage = z80.HL;
+    z80.HL = z80.IY;
+    z80.PC += 1;
+    displacment = readMem(z80.PC + 1);
+    if (readMem(z80.PC) != 0xCB) {
+      runOpcode(readMem(z80.PC));
+    }
+    z80.IY = z80.HL;
+    z80.HL = hlStorage;
+    isHL_IX_IY = false;
+    break;
     break;
   case 0xFE:
     cp(readN());
@@ -1997,5 +2042,11 @@ void bitInstructions(uint16_t opcode) {
   }
 }
 void miscInstructions(uint16_t opcode) {
-  printf("**SCREAM** I cant beleve that you gave me something i dont know (yet): 0x%X\n", opcode);
+  z80.PC += 1;
+  printf("**SCREAM** I cant beleve that you gave me something i dont know (yet): 0x%X\n", readMem(opcode));
+  if (z80.R + 1 == 0x80) {
+    z80.R = 0;
+  } else {
+    z80.R++;
+  }
 }

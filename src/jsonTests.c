@@ -1,5 +1,5 @@
-#include "z80.h"
 #include "common.h"
+#include "z80.h"
 
 cpu_t z80 = {0};
 bool success = true;
@@ -16,7 +16,7 @@ void set_value(void *var, const char *value, char type) {
     break;
   }
 }
-void step(struct json_array_element_s *myTests) {
+void jsonStep(struct json_array_element_s *myTests) {
   struct json_object_element_s *currentTest = json_value_as_object(myTests->value)->start->next;
   struct json_object_s *initalValue = json_value_as_object(currentTest->value);
   struct json_object_s *expectedFinalValue = json_value_as_object(currentTest->next->value);
@@ -77,15 +77,7 @@ void step(struct json_array_element_s *myTests) {
     writeMem(address, value);
     i++;
   }
-
-  // Da Meat
-  handleInterupts();
-  if (!z80.halt) {
-    runOpcode(readMem(z80.PC));
-  } else {
-    runOpcode(0x0);
-  }
-
+  cpuStep();
   struct json_object_element_s *finalObjects = expectedFinalValue->start;
   int actual = 0;
   struct objects finalRegisters[] = {
@@ -123,7 +115,7 @@ void step(struct json_array_element_s *myTests) {
       }
       if ((actual != atoi(json_value_as_number(finalObjects->value)->number))) {
         if (strcmp(finalRegisters[j].name, "F") != 0) {
-          printf("Fail: Expected value for %s is 0x%X, Actual value for %s is 0x%X on test %s\n", finalObjects->name->string, atoi(json_value_as_number(finalObjects->value)->number), finalRegisters[j].name, actual, name->string);
+          printf("Fail: Expected value for %s is %d, Actual value for %s is %d on test %s\n", finalObjects->name->string, atoi(json_value_as_number(finalObjects->value)->number), finalRegisters[j].name, actual, name->string);
         } else {
           printf("Fail: Expected value for %s is " BYTE_TO_BINARY_PATTERN ", Actual value for %s is " BYTE_TO_BINARY_PATTERN " Diffrence is " BYTE_TO_BINARY_PATTERN " on test %s\n", finalObjects->name->string, BYTE_TO_BINARY(atoi(json_value_as_number(finalObjects->value)->number)), finalRegisters[j].name, BYTE_TO_BINARY(actual), BYTE_TO_BINARY(actual ^ (atoi(json_value_as_number(finalObjects->value)->number))), name->string);
           printf("                                                                                    ^^^^^^^^\n");
@@ -149,7 +141,7 @@ void step(struct json_array_element_s *myTests) {
     int actualValue = readMem(address);
 
     if (expectedValue != actualValue) {
-      printf("RAM Test Fail: Expected value at 0x%X is 0x%X, Actual value is 0x%X on test %s\n", address, expectedValue, actualValue, name->string);
+      printf("RAM Test Fail: Expected value at %d is %d, Actual value is %d on test %s\n", address, expectedValue, actualValue, name->string);
       success = false;
       exit(0);
     }
@@ -179,9 +171,5 @@ void step(struct json_array_element_s *myTests) {
   if (data != z80.data) {
     printf("Fail: Expected value for the data is 0x%X, Actual value for data is 0x%X on test %s\n", data, z80.data, name->string);
     exit(0);
-  }
-}
-void handleInterupts() {
-  if (z80.halt) {
   }
 }

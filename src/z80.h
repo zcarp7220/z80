@@ -90,6 +90,8 @@ typedef struct cpu {
   bool IFF1;
   bool IFF2;
   bool wasLastInstEI;
+  bool MI;
+  bool NMI;
   // I/O Registers
   uint16_t address;
   uint8_t data;
@@ -99,5 +101,6 @@ typedef struct cpu {
 extern cpu_t z80;
 void runOpcode(uint8_t opcode);
 void handleInterupts();
+void cpuStep();
 void bitInstructions(uint16_t opcode);
 void miscInstructions(uint16_t opcode);
