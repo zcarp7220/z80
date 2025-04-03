@@ -139,7 +139,7 @@ void jsonStep(struct json_array_element_s *myTests) {
           printf("                                                                                    SZ5H3PNC\n");
         }
         success = false;
-        //exit(0);
+        exit(0);
       }
       j++;
     }

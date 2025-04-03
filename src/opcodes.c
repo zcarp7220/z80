@@ -2252,9 +2252,10 @@ void miscInstructions(uint8_t opcode) {
     z80.PC += 1;
     break;
     case 0x62:
-    sub(z80.HL, z80.SP, &z80.HL, 'w',readFlag(Z80_CF));
-    checkSet(Z80_SF, (z80.HL & 0x80) != 0);
-    checkSet(Z80_ZF, z80.HL == 0);
+    var = z80.HL;
+    sub(z80.HL, z80.HL, &z80.HL, 'w',readFlag(Z80_CF));
+    checkSet(Z80_SF, (var & 0x80) != 0);
+    checkSet(Z80_ZF, (uint16_t)var == 0);
     break;
     case 0x63:
     writeMem(readNN(), z80.L);
@@ -2338,10 +2339,11 @@ void miscInstructions(uint8_t opcode) {
     sub(z80.SP, z80.HL, &z80.HL, 'w',readFlag(Z80_CF));
     checkSet(Z80_SF, (z80.HL & 0x80) != 0);
     checkSet(Z80_ZF, z80.HL == 0);
+    setUndocumentedFlags(z80.HL << 8);
     break;
     case 0x73:
-    writeMem(readNN(), z80.SP & 0xF);
-    writeMem(readNN() + 1, z80.SP & 0xF0);
+    writeMem(readNN(), z80.SP & 0x00FF);
+    writeMem(readNN() + 1, (z80.SP & 0xFF00) >> 8);
     z80.PC += 3;
     break;
     case 0x74:

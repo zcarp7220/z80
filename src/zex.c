@@ -14,11 +14,11 @@ void zexStep() {
 
   for (;;) {   
     fprintf(stderr, "PC: 0x%X, 3 bytes after PC: 0x%X 0x%X 0x%X\n", z80.PC, readMem(z80.PC), readMem(z80.PC + 1), readMem(z80.PC + 2));
-    fprintf(stderr, "Cycles: %lld A: 0x%02X  BC: 0x%02X %02X  DE: 0x%02X %02X  HL: 0x%02X %02X\n",
+    fprintf(stderr, "Cycles: %lld A: 0x%02X  B: 0x%02X C: 0x%02X  D: 0x%02X E: 0x%02X  H: 0x%02X L: 0x%02X SP: 0x%02X\n",
       z80.cycles, z80.A,
       z80.B, z80.C,  
       z80.D, z80.E,  
-      z80.H, z80.L);
+      z80.H, z80.L, z80.SP);
       cpuStep();
     if(z80.PC == 0){
       exit(0);
