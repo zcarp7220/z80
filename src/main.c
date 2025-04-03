@@ -9,6 +9,7 @@
 uint8_t ram[0xFFFF];
 
 inline void writeMem(uint16_t addr, uint8_t data) {
+  fprintf(stderr,"0x%X written to 0x%X\n", data, addr);
   ram[addr] = data;
 }
 
@@ -89,8 +90,13 @@ int main(int argc, char *argv[]) {
     }
     fclose(file);
     for (size_t i = 0; i < fileSize; ++i) {
-      writeMem(0x100 + i, buffer[i]);
+      ram[0x100 + i] =buffer[i];
     }
+    ram[0x0000] =0xD3;
+    ram[0x0001] =0x00;
+    ram[0x0005] =0xDB;
+    ram[0x0006] =0x00;
+    ram[0x0007] =0xC9;
     free(buffer);
     zexStep();
   } else {

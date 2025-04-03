@@ -24,6 +24,7 @@ void cpuStep() {
   } else {
     runOpcode(0x0);
   }
+  z80.cycles += 1;
 }
 void handleInterupts() {
   if (z80.halt && (z80.NMI || z80.MI)) {
@@ -110,6 +111,15 @@ static inline void sub(int A, int B, void *storeLocation, char width, bool carry
     setFlag(Z80_NF);
     checkSet(Z80_HF, !readFlag(Z80_HF));
     checkSet(Z80_CF, A < B + carry);
+  }else if(width == 'w'){
+    uint16_t result = A + ~(B) + carry;
+    add(A, ~B, storeLocation, 'w', !carry);
+    setFlag(Z80_NF);
+    checkSet(Z80_HF, !readFlag(Z80_HF));
+    checkSet(Z80_CF, A < B + carry);
+    checkSet(Z80_PF, ((A ^ result) & (~B ^ result) & 0x8000) != 0);
+    checkSet(Z80_ZF, result == 0);
+    checkSet(Z80_SF, (result & 0x8000) != 0);
   }
 }
 
@@ -397,6 +407,11 @@ void jp(bool input) {
   }
 }
 void runOpcode(uint8_t opcode) {
+  if (z80.R + 1 == 0x80) {
+    z80.R = 0;
+  } else {
+    z80.R++;
+  }
   switch (opcode) {
   case 0x00:
     z80.PC += 1;
@@ -1106,7 +1121,10 @@ void runOpcode(uint8_t opcode) {
     jp(readFlag(Z80_CF));
     break;
   case 0xDB:
-    z80.PC += 2;
+  if(z80.address == (z80.A << 8 | readN())){
+  z80.A = z80.data;
+  }
+  z80.PC += 2;
     break;
   case 0xDC:
     call(readFlag(Z80_CF));
@@ -1178,7 +1196,7 @@ void runOpcode(uint8_t opcode) {
     break;
   case 0xED:
     z80.PC += 1;
-    miscInstructions(z80.PC);
+    miscInstructions(readMem(z80.PC));
     break;
   case 0xEE:
     xor(readN());
@@ -1257,13 +1275,13 @@ void runOpcode(uint8_t opcode) {
   default:
     printf("Unhandeld Opcode, 0x%X", z80.PC);
   }
+}
+void bitInstructions(uint8_t opcode) {
   if (z80.R + 1 == 0x80) {
     z80.R = 0;
   } else {
     z80.R++;
   }
-}
-void bitInstructions(uint16_t opcode) {
   switch (opcode) {
   case 0x0:
     rotateC('l', &z80.B);
@@ -2034,19 +2052,380 @@ void bitInstructions(uint16_t opcode) {
     set(7, &z80.A);
     break;
   }
-
+}
+void miscInstructions(uint8_t opcode) {
   if (z80.R + 1 == 0x80) {
     z80.R = 0;
   } else {
     z80.R++;
   }
-}
-void miscInstructions(uint16_t opcode) {
-  z80.PC += 1;
-  printf("**SCREAM** I cant beleve that you gave me something i dont know (yet): 0x%X\n", readMem(opcode));
-  if (z80.R + 1 == 0x80) {
-    z80.R = 0;
-  } else {
-    z80.R++;
+  switch(opcode){
+    case 0x40:
+    if(z80.address == z80.BC){
+      z80.B = z80.data;
+    }
+    clearFlag(Z80_NF);
+    clearFlag(Z80_HF);
+    checkSet(Z80_PF, getParity(z80.B));
+    checkSet(Z80_SF, (z80.B & 0x80) != 0);
+    checkSet(Z80_ZF, z80.B == 0);
+    setUndocumentedFlags(z80.B);
+    z80.PC += 1;
+    break;
+    case 0x41:
+    z80.address = z80.BC;
+    z80.data = z80.B;
+    z80.PC += 1;
+    break;
+    case 0x42:
+    sub(z80.HL, z80.BC, &z80.HL, 'w',readFlag(Z80_CF));
+    break;
+    case 0x43:
+    writeMem(readNN(), z80.C);
+    writeMem(readNN() + 1, z80.B);
+    z80.PC += 3;
+    break;
+    case 0x44:
+    sub(0, z80.A, &z80.A, 'b', false);
+    break;
+    case 0x45:
+    z80.IFF1 = z80.IFF2;
+    z80.PC = pop16();
+    break;
+    case 0x46:
+    z80.IM = 0;
+    z80.PC += 1;
+    break;
+    case 0x47:
+    LD(z80.I, z80.A);
+    break;
+    case 0x48:
+    if(z80.address == z80.BC){
+      z80.C = z80.data;
+    }
+    clearFlag(Z80_NF);
+    clearFlag(Z80_HF);
+    checkSet(Z80_PF, getParity(z80.C));
+    checkSet(Z80_SF, (z80.C & 0x80) != 0);
+    checkSet(Z80_ZF, z80.C == 0);
+    setUndocumentedFlags(z80.C);
+    z80.PC += 1;
+    break;
+    case 0x49:
+    z80.address = z80.BC;
+    z80.data = z80.C;
+    z80.PC += 1;
+    break;
+    case 0x4A:
+    var = z80.HL;
+    add(z80.HL, z80.BC, &z80.HL, 'w',readFlag(Z80_CF));
+    checkSet(Z80_PF, ((var ^ z80.HL) & (z80.BC ^ z80.HL) & 0x8000) != 0);
+    checkSet(Z80_ZF, z80.HL == 0);
+    checkSet(Z80_SF, (z80.HL & 0x8000) != 0);
+    break;
+    case 0x4B:
+    LD(z80.BC, getValueAtMemory());
+    z80.PC += 1;
+    break;
+    case 0x4C:
+    sub(0, z80.A, &z80.A, 'b', false);
+    break;
+    case 0x4D:
+    z80.IFF1 = z80.IFF2;
+    ret(true);
+    break;
+    case 0x4E:
+    z80.IM = 0;
+    z80.PC += 1;
+    break;
+    case 0x4F:
+    LD(z80.R, z80.A);
+    break;
+    case 0x50:
+    if(z80.address == z80.BC){
+      z80.D = z80.data;
+    }
+    clearFlag(Z80_NF);
+    clearFlag(Z80_HF);
+    checkSet(Z80_PF, getParity(z80.D));
+    checkSet(Z80_SF, (z80.D & 0x80) != 0);
+    checkSet(Z80_ZF, z80.D == 0);
+    setUndocumentedFlags(z80.D);
+    z80.PC += 1;
+    break;
+    case 0x51:
+    z80.address = z80.BC;
+    z80.data = z80.D;
+    z80.PC += 1;
+    break;
+    case 0x52:
+    sub(z80.HL, z80.DE, &z80.HL, 'w',readFlag(Z80_CF));
+    break;
+    case 0x53:
+    writeMem(readNN(), z80.E);
+    writeMem(readNN() + 1, z80.D);
+    z80.PC += 3;
+    break;
+    case 0x54:
+    sub(0, z80.A, &z80.A, 'b', false);
+    break;
+    case 0x55:
+    z80.IFF1 = z80.IFF2;
+    z80.PC = pop16();
+    break;
+    case 0x56:
+    z80.IM = 1;
+    z80.PC += 1;
+    break;
+    case 0x57:
+    LD(z80.A, z80.I);
+    clearFlag(Z80_HF);
+    clearFlag(Z80_NF);
+    checkSet(Z80_ZF, z80.A == 0);
+    checkSet(Z80_SF, (z80.A & 0x80)!= 0);
+    checkSet(Z80_PF, z80.IFF2);
+    setUndocumentedFlags(z80.A);
+    break;
+    case 0x58:
+    if(z80.address == z80.BC){
+      z80.E = z80.data;
+    }
+    clearFlag(Z80_NF);
+    clearFlag(Z80_HF);
+    checkSet(Z80_PF, getParity(z80.E));
+    checkSet(Z80_SF, (z80.E & 0x80) != 0);
+    checkSet(Z80_ZF, z80.E == 0);
+    setUndocumentedFlags(z80.E);
+    z80.PC += 1;
+    break;
+    case 0x59:
+    z80.address = z80.BC;
+    z80.data = z80.E;
+    z80.PC += 1;
+    break;
+    case 0x5A:
+    var = z80.HL;
+    add(z80.HL, z80.DE, &z80.HL, 'w',readFlag(Z80_CF));
+    checkSet(Z80_PF, ((var ^ z80.HL) & (z80.DE ^ z80.HL) & 0x8000) != 0);
+    checkSet(Z80_ZF, z80.HL == 0);
+    checkSet(Z80_SF, (z80.HL & 0x8000) != 0);
+    break;
+    case 0x5B:
+    LD(z80.DE, getValueAtMemory());
+    z80.PC += 1;
+    break;
+    case 0x5C:
+    sub(0, z80.A, &z80.A, 'b', false);
+    break;
+    case 0x5D:
+    z80.IFF1 = z80.IFF2;
+    ret(true);
+    break;
+    case 0x5E:
+    z80.IM = 2;
+    z80.PC += 1;
+    break;
+    case 0x5F:
+    LD(z80.A, z80.R);
+    clearFlag(Z80_HF);
+    clearFlag(Z80_NF);
+    checkSet(Z80_ZF, z80.A == 0);
+    checkSet(Z80_SF, (z80.A & 0x80)!= 0);
+    checkSet(Z80_PF, z80.IFF2);
+    setUndocumentedFlags(z80.A);
+    break;
+    case 0x60:
+    if(z80.address == z80.BC){
+      z80.H = z80.data;
+    }
+    clearFlag(Z80_NF);
+    clearFlag(Z80_HF);
+    checkSet(Z80_PF, getParity(z80.H));
+    checkSet(Z80_SF, (z80.H & 0x80) != 0);
+    checkSet(Z80_ZF, z80.H == 0);
+    setUndocumentedFlags(z80.H);
+    z80.PC += 1;
+    break;
+    case 0x61:
+    z80.address = z80.BC;
+    z80.data = z80.H;
+    z80.PC += 1;
+    break;
+    case 0x62:
+    sub(z80.HL, z80.SP, &z80.HL, 'w',readFlag(Z80_CF));
+    checkSet(Z80_SF, (z80.HL & 0x80) != 0);
+    checkSet(Z80_ZF, z80.HL == 0);
+    break;
+    case 0x63:
+    writeMem(readNN(), z80.L);
+    writeMem(readNN() + 1, z80.H);
+    z80.PC += 3;
+    break;
+    case 0x64:
+    sub(0, z80.A, &z80.A, 'b', false);
+    break;
+    case 0x65:
+    z80.IFF1 = z80.IFF2;
+    z80.PC = pop16();
+    break;
+    case 0x66:
+    z80.IM = 0;
+    z80.PC += 1;
+    break;
+    case 0x67:
+    //TODO: RRD
+    break;
+    case 0x68:
+    if(z80.address == z80.BC){
+      z80.L = z80.data;
+    }
+    clearFlag(Z80_NF);
+    clearFlag(Z80_HF);
+    checkSet(Z80_PF, getParity(z80.L));
+    checkSet(Z80_SF, (z80.L & 0x80) != 0);
+    checkSet(Z80_ZF, z80.L == 0);
+    setUndocumentedFlags(z80.L);
+    z80.PC += 1;
+    break;
+    case 0x69:
+    z80.address = z80.BC;
+    z80.data = z80.L;
+    z80.PC += 1;
+    break;
+    case 0x6A:
+    var = z80.HL;
+    add(z80.HL, z80.HL, &z80.HL, 'w',readFlag(Z80_CF));
+    checkSet(Z80_PF, ((var ^ z80.HL) & (z80.HL ^ z80.HL) & 0x8000) != 0);
+    checkSet(Z80_ZF, z80.HL == 0);
+    checkSet(Z80_SF, (z80.HL & 0x8000) != 0);
+    break;
+    case 0x6B:
+    LD(z80.HL, getValueAtMemory());
+    z80.PC += 1;
+    break;
+    case 0x6C:
+    sub(0, z80.A, &z80.A, 'b', false);
+    break;
+    case 0x6D:
+    z80.IFF1 = z80.IFF2;
+    ret(true);
+    break;
+    case 0x6E:
+    z80.IM = 0;
+    z80.PC += 1;
+    break;
+    case 0x6F:
+    //TODO: RLD
+    break;
+    case 0x70:
+    if(z80.address == z80.BC){
+      temp = z80.data;
+    }
+    clearFlag(Z80_NF);
+    clearFlag(Z80_HF);
+    checkSet(Z80_PF, getParity(temp));
+    checkSet(Z80_SF, (temp & 0x80) != 0);
+    checkSet(Z80_ZF, temp == 0);
+    setUndocumentedFlags(temp);
+    z80.PC += 1;
+    break;
+    case 0x71:
+    z80.address = z80.BC;
+    z80.data = 0;
+    z80.PC += 1;
+    break;
+    case 0x72:
+    sub(z80.SP, z80.HL, &z80.HL, 'w',readFlag(Z80_CF));
+    checkSet(Z80_SF, (z80.HL & 0x80) != 0);
+    checkSet(Z80_ZF, z80.HL == 0);
+    break;
+    case 0x73:
+    writeMem(readNN(), z80.SP & 0xF);
+    writeMem(readNN() + 1, z80.SP & 0xF0);
+    z80.PC += 3;
+    break;
+    case 0x74:
+    sub(0, z80.A, &z80.A, 'b', false);
+    break;
+    case 0x75:
+    z80.IFF1 = z80.IFF2;
+    z80.PC = pop16();
+    break;
+    case 0x76:
+    z80.IM = 1;
+    z80.PC += 1;
+    break;
+    case 0x77:
+    z80.PC += 1;
+    break;
+    case 0x78:
+    if(z80.address == z80.BC){
+      z80.A = z80.data;
+    }
+    clearFlag(Z80_NF);
+    clearFlag(Z80_HF);
+    checkSet(Z80_PF, getParity(z80.A));
+    checkSet(Z80_SF, (z80.A & 0x80) != 0);
+    checkSet(Z80_ZF, z80.A == 0);
+    setUndocumentedFlags(z80.A);
+    z80.PC += 1;
+    break;
+    case 0x79:
+    z80.address = z80.BC;
+    z80.data = z80.A;
+    z80.PC += 1;
+    break;
+    case 0x7A:
+    var = z80.HL;
+    add(z80.HL, z80.SP, &z80.HL, 'w',readFlag(Z80_CF));
+    checkSet(Z80_PF, ((var ^ z80.HL) & (z80.HL ^ z80.HL) & 0x8000) != 0);
+    checkSet(Z80_ZF, z80.HL == 0);
+    checkSet(Z80_SF, (z80.HL & 0x8000) != 0);
+    break;
+    case 0x7B:
+    LD(z80.SP, getValueAtMemory());
+    z80.PC += 1;
+    break;
+    case 0x7C:
+    sub(0, z80.A, &z80.A, 'b', false);
+    break;
+    case 0x7D:
+    z80.IFF1 = z80.IFF2;
+    z80.PC = pop16();
+    break;
+    case 0x7E:
+    z80.IM = 2;
+    z80.PC += 1;
+    break;
+    case 0x7F:
+    z80.PC += 1;
+    break;
+    case 0xA0:
+    temp = readMem(z80.HL++);
+    clearFlag(Z80_NF | Z80_HF);
+    writeMem(z80.DE++, temp);
+    temp += z80.A;
+    checkSet(Z80_PF, z80.BC--);
+    checkSet(Z80_F3, temp & Z80_F3);
+    checkSet(Z80_F5, temp & 0x2);
+    z80.PC += 1;
+    break;
+    case 0xB0:
+    temp = readMem(z80.HL++);
+    clearFlag(Z80_NF | Z80_HF);
+    writeMem(z80.DE++, temp);
+    temp += z80.A;
+    checkSet(Z80_PF, z80.BC--);
+    checkSet(Z80_F3, temp & Z80_F3);
+    checkSet(Z80_F5, temp & 0x2);
+    if(z80.BC != 0){
+      z80.PC -= 2;
+    }
+    z80.PC += 1;
+    break;
+    default:
+    exit(-1);
+    z80.PC += 1;
+    break;
   }
 }

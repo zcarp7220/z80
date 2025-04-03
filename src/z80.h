@@ -20,64 +20,16 @@
       ((byte)&0x01 ? '1' : '0')
 typedef struct cpu {
   bool halt;
-  // Registers
-  union {
-    struct {
-      uint8_t F;
-      uint8_t A;
-    };
-    uint16_t AF;
-  };
-  union {
-    struct {
-      uint8_t C;
-      uint8_t B;
-    };
-    uint16_t BC;
-  };
-  union {
-    struct {
-      uint8_t E;
-      uint8_t D;
-    };
-    uint16_t DE;
-  };
-  union {
-    struct {
-      uint8_t L;
-      uint8_t H;
-    };
-    uint16_t HL;
-  };
-  // Shadow Registers
-  union {
-    struct {
-      uint8_t Fp;
-      uint8_t Ap;
-    };
-    uint16_t AFp;
-  };
-  union {
-    struct {
-      uint8_t Cp;
-      uint8_t Bp;
-    };
-    uint16_t BCp;
-  };
-  union {
-    struct {
-      uint8_t Ep;
-      uint8_t Dp;
-    };
-    uint16_t DEp;
-  };
-  union {
-    struct {
-      uint8_t Lp;
-      uint8_t Hp;
-    };
-    uint16_t HLp;
-  };
+//Registers
+union{struct{uint8_t F; uint8_t A;};uint16_t AF; };
+union{struct{uint8_t C; uint8_t B;};uint16_t BC; };
+union{struct{uint8_t E; uint8_t D;};uint16_t DE; };
+union{struct{uint8_t L; uint8_t H;};uint16_t HL; };
+//Shadow Registers
+union{struct{uint8_t Fp; uint8_t Ap;};uint16_t AFp; };
+union{struct{uint8_t Cp; uint8_t Bp;};uint16_t BCp; };
+union{struct{uint8_t Ep; uint8_t Dp;};uint16_t DEp; };
+union{struct{uint8_t Lp; uint8_t Hp;};uint16_t HLp; };
   // Speacal Purpose Registers
   uint16_t PC;
   uint16_t SP;
@@ -92,6 +44,7 @@ typedef struct cpu {
   bool wasLastInstEI;
   bool MI;
   bool NMI;
+  long long cycles;
   // I/O Registers
   uint16_t address;
   uint8_t data;
@@ -102,5 +55,5 @@ extern cpu_t z80;
 void runOpcode(uint8_t opcode);
 void handleInterupts();
 void cpuStep();
-void bitInstructions(uint16_t opcode);
-void miscInstructions(uint16_t opcode);
+void bitInstructions(uint8_t opcode);
+void miscInstructions(uint8_t opcode);

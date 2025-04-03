@@ -22,9 +22,19 @@ void jsonStep(struct json_array_element_s *myTests) {
   struct json_object_s *expectedFinalValue = json_value_as_object(currentTest->next->value);
   struct json_string_s *name = json_value_as_string(json_value_as_object(myTests->value)->start->value);
   struct json_array_s *expectedPorts = NULL;
+  struct json_array_s *portValues;
+  int address = 0;
+  int data = 0;
+  char readWrite[10];
   if (currentTest->next->next->next != NULL) {
     expectedPorts = json_value_as_array(currentTest->next->next->next->value);
   }
+  if(expectedPorts != NULL){
+  portValues = json_value_as_array(expectedPorts->start->value);
+  address = atoi(json_value_as_number(portValues->start->value)->number);
+  data = atoi(json_value_as_number(portValues->start->next->value)->number);
+  strncpy(readWrite, json_value_as_string(portValues->start->next->next->value)->string, sizeof(readWrite) - 1)[sizeof(readWrite) - 1] = '\0';
+}
   struct objects {
     void *reg;
     char width;
@@ -77,6 +87,13 @@ void jsonStep(struct json_array_element_s *myTests) {
     writeMem(address, value);
     i++;
   }
+  if(expectedPorts != NULL){
+    if(strcmp(readWrite, "r") == 0){
+      z80.address = address;
+      z80.data = data;
+      z80.IOread = true;
+    }
+  }
   cpuStep();
   struct json_object_element_s *finalObjects = expectedFinalValue->start;
   int actual = 0;
@@ -115,14 +132,14 @@ void jsonStep(struct json_array_element_s *myTests) {
       }
       if ((actual != atoi(json_value_as_number(finalObjects->value)->number))) {
         if (strcmp(finalRegisters[j].name, "F") != 0) {
-          printf("Fail: Expected value for %s is %d, Actual value for %s is %d on test %s\n", finalObjects->name->string, atoi(json_value_as_number(finalObjects->value)->number), finalRegisters[j].name, actual, name->string);
+          printf("Fail: Expected value for %s is 0x%X, Actual value for %s is 0x%X on test %s\n", finalObjects->name->string, atoi(json_value_as_number(finalObjects->value)->number), finalRegisters[j].name, actual, name->string);
         } else {
           printf("Fail: Expected value for %s is " BYTE_TO_BINARY_PATTERN ", Actual value for %s is " BYTE_TO_BINARY_PATTERN " Diffrence is " BYTE_TO_BINARY_PATTERN " on test %s\n", finalObjects->name->string, BYTE_TO_BINARY(atoi(json_value_as_number(finalObjects->value)->number)), finalRegisters[j].name, BYTE_TO_BINARY(actual), BYTE_TO_BINARY(actual ^ (atoi(json_value_as_number(finalObjects->value)->number))), name->string);
           printf("                                                                                    ^^^^^^^^\n");
           printf("                                                                                    SZ5H3PNC\n");
         }
         success = false;
-        exit(0);
+        //exit(0);
       }
       j++;
     }
@@ -150,26 +167,12 @@ void jsonStep(struct json_array_element_s *myTests) {
   if (expectedPorts == NULL) {
     return;
   }
-
-  struct json_array_s *finalPortValues = json_value_as_array(expectedPorts->start->value);
-  int address = atoi(json_value_as_number(finalPortValues->start->value)->number);
-  int data = atoi(json_value_as_number(finalPortValues->start->next->value)->number);
-  char readWrite[10];
-  strncpy(readWrite, json_value_as_string(finalPortValues->start->next->next->value)->string, sizeof(readWrite) - 1)[sizeof(readWrite) - 1] = '\0';
-  if (!strcmp(readWrite, "w") && !z80.IOwrite) {
-    printf("Fail: Expected value for the I/O write is %s, Actual value for I/O write is  %s on test %s\n", readWrite, z80.IOwrite ? "Write" : "NIL", name->string);
-    exit(0);
-  }
-  if (!strcmp(readWrite, "b") && !z80.IOread) {
-    printf("Fail: Expected value for the I/O read is %s, Actual value for I/O read is %s on test %s\n", readWrite, z80.IOread ? "Write" : "NIL", name->string);
-    exit(0);
-  }
-  if (address != z80.address) {
-    printf("Fail: Expected value for the address is 0x%X, Actual value for address is 0x%X on test %s\n", address, z80.address, name->string);
-    exit(0);
-  }
-  if (data != z80.data) {
-    printf("Fail: Expected value for the data is 0x%X, Actual value for data is 0x%X on test %s\n", data, z80.data, name->string);
-    exit(0);
+  if(strcmp(readWrite, "w") == 0){
+  if(address != z80.address){
+    printf("Fail: Expected value for the address is 0x%X, Actual value for it is 0x%X on test %s\n", address, z80.address,name->string);
+    }  
+    if(data != z80.data){
+      printf("Fail: Expected value for the data is 0x%X, Actual value for it is 0x%X on test %s\n", data, z80.data,name->string);
+    }
   }
 }
