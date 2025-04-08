@@ -6,16 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-uint8_t ram[0xFFFF];
-
-inline void writeMem(uint16_t addr, uint8_t data) {
-  fprintf(stderr,"0x%X written to 0x%X\n", data, addr);
-  ram[addr] = data;
-}
-
-inline uint8_t readMem(uint16_t addr) {
-  return ram[addr];
-}
+uint8_t json[8704];
 
 int main(int argc, char *argv[]) {
   if (argc < 3) {
@@ -89,14 +80,7 @@ int main(int argc, char *argv[]) {
       return 1;
     }
     fclose(file);
-    for (size_t i = 0; i < fileSize; ++i) {
-      ram[0x100 + i] =buffer[i];
-    }
-    ram[0x0000] =0xD3;
-    ram[0x0001] =0x00;
-    ram[0x0005] =0xDB;
-    ram[0x0006] =0x00;
-    ram[0x0007] =0xC9;
+    zexInit(buffer, fileSize);
     free(buffer);
     zexStep();
   } else {

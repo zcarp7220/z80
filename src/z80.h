@@ -45,15 +45,15 @@ union{struct{uint8_t Lp; uint8_t Hp;};uint16_t HLp; };
   bool MI;
   bool NMI;
   long long cycles;
-  // I/O Registers
-  uint16_t address;
-  uint8_t data;
-  bool IOwrite;
-  bool IOread;
+  //Functions
+  uint8_t (*readByte)(void* ,uint16_t);
+  void (*writeByte)(void* ,uint16_t, uint8_t);
+  int (*in)(void*, uint8_t);
+  void (*out)(void*, uint16_t, uint8_t);
 } cpu_t;
-extern cpu_t z80;
-void runOpcode(uint8_t opcode);
-void handleInterupts();
-void cpuStep();
-void bitInstructions(uint8_t opcode);
-void miscInstructions(uint8_t opcode);
+void runOpcode(cpu_t* z80, uint8_t opcode);
+void handleInterupts(cpu_t* z80);
+void cpuStep(cpu_t* z80);
+void bitInstructions(cpu_t* z80, uint8_t opcode);
+void miscInstructions(cpu_t* z80, uint8_t opcode);
+void z80Init(cpu_t *z80);
