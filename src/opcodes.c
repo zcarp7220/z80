@@ -20,14 +20,14 @@ bool oldParity, oldSign, oldZero, isHL_IX_IY;
 static inline uint8_t readMem(cpu_t *const z, uint16_t addr) {
   return z->readByte(z, addr);
 }
-static inline void writeMem(cpu_t *const z, uint8_t data, uint16_t addr) {
-  z->writeByte(z, data, addr);
+static inline void writeMem(cpu_t *const z, uint16_t addr, uint8_t data) {
+  z->writeByte(z, addr, data);
 }
 static inline uint8_t in(cpu_t *const z, uint16_t addr) {
   return z->in(z, addr);
 }
 static inline void out(cpu_t *const z, uint8_t data, uint16_t addr) {
-  z->out(z, data, addr);
+  z->out(z, addr, data);
 }
 void cpuStep(cpu_t *z80) {
   handleInterupts(z80);

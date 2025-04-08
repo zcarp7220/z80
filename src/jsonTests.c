@@ -157,7 +157,7 @@ void jsonStep(struct json_array_element_s *myTests) {
     int actualValue = readMem(NULL, address);
 
     if (expectedValue != actualValue) {
-      printf("RAM Test Fail: Expected value at %d is %d, Actual value is %d on test %s\n", address, expectedValue, actualValue, name->string);
+      printf("RAM Test Fail: Expected value at 0x%X is 0x%X, Actual value is 0x%X on test %s\n", address, expectedValue, actualValue, name->string);
       success = false;
       exit(0);
     }
