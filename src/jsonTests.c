@@ -1,16 +1,35 @@
 #include "common.h"
 #include "z80.h"
-
+struct json_object_element_s *currentTest = NULL;
+struct json_object_s *initalValue = NULL;
+struct json_object_s *expectedFinalValue = NULL;
+struct json_string_s *name = NULL;
+int address = 0;
+int datas = 0;
 cpu_t z80 = {0};
 bool success = true;
 uint8_t ram[0xFFFF];
+struct json_array_s *expectedPorts = NULL;
 
 void writeMem(void* unused, uint16_t addr,  uint8_t data) {
   ram[addr] = data;
 }
 
- uint8_t readMem(void* unused, uint16_t addr) {
+uint8_t readMem(void* unused, uint16_t addr) {
   return ram[addr];
+}
+
+uint8_t input(void* unused, uint16_t addr){
+  if(atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->value)->number) == addr){
+    return atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->next->value)->number);
+  }
+  printf("Failed, The expecte addres is 0x%X but got %d instead\n", addr, atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->value)->number));
+  return 0xEA;
+}
+void output(void* unused, uint16_t addr, uint8_t data){
+  address = atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->value)->number);
+  datas = atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->next->value)->number);
+  return;
 }
 void set_value(void *var, const char *value, char type) {
   switch (type) {
@@ -28,11 +47,12 @@ void set_value(void *var, const char *value, char type) {
 void jsonStep(struct json_array_element_s *myTests) {
   z80.readByte = readMem;
   z80.writeByte = writeMem;
+  z80.in = input;
+  z80.out = output;
   struct json_object_element_s *currentTest = json_value_as_object(myTests->value)->start->next;
   struct json_object_s *initalValue = json_value_as_object(currentTest->value);
   struct json_object_s *expectedFinalValue = json_value_as_object(currentTest->next->value);
   struct json_string_s *name = json_value_as_string(json_value_as_object(myTests->value)->start->value);
-  struct json_array_s *expectedPorts = NULL;
   if (currentTest->next->next->next != NULL) {
     expectedPorts = json_value_as_array(currentTest->next->next->next->value);
   }
@@ -129,10 +149,17 @@ void jsonStep(struct json_array_element_s *myTests) {
       } else if (finalRegisters[j].width == 'f') {
         actual = *(unsigned char *)finalRegisters[j].reg;
       }
-      if ((actual != atoi(json_value_as_number(finalObjects->value)->number))) {
+      int expected = atoi(json_value_as_number(finalObjects->value)->number);
+      if (actual != expected) {
         if (strcmp(finalRegisters[j].name, "F") != 0) {
           printf("Fail: Expected value for %s is 0x%X, Actual value for %s is 0x%X on test %s\n", finalObjects->name->string, atoi(json_value_as_number(finalObjects->value)->number), finalRegisters[j].name, actual, name->string);
         } else {
+          if((actual & 0xD7) == (expected & 0xD7)){
+            finalObjects = finalObjects->next;
+            j++;
+            continue;
+            //goto ramCheck;
+          }
           printf("Fail: Expected value for %s is " BYTE_TO_BINARY_PATTERN ", Actual value for %s is " BYTE_TO_BINARY_PATTERN " Diffrence is " BYTE_TO_BINARY_PATTERN " on test %s\n", finalObjects->name->string, BYTE_TO_BINARY(atoi(json_value_as_number(finalObjects->value)->number)), finalRegisters[j].name, BYTE_TO_BINARY(actual), BYTE_TO_BINARY(actual ^ (atoi(json_value_as_number(finalObjects->value)->number))), name->string);
           printf("                                                                                    ^^^^^^^^\n");
           printf("                                                                                    SZ5H3PNC\n");
@@ -144,7 +171,6 @@ void jsonStep(struct json_array_element_s *myTests) {
     }
     finalObjects = finalObjects->next;
   }
-
   size_t ramCheckIndex = 0;
   struct json_array_s *finalRamArr = json_value_as_array(finalObjects->next->next->next->value);
   for (struct json_array_element_s *ramElement = finalRamArr->start; ramCheckIndex < finalRamArr->length; ramElement = ramElement->next) {

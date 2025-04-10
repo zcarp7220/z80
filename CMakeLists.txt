@@ -6,7 +6,7 @@ src/jsonTests.c
 src/z80.h
 src/common.h
 src/main.c
-src/opcodes.c
+src/z80.c
 src/zex.c
 )
 

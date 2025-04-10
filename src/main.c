@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (success) {
-      printf("You Passed the test!");
+      //printf("You Passed the test!");
     }
 
     free(json);

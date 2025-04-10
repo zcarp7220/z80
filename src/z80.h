@@ -25,6 +25,7 @@ union{struct{uint8_t F; uint8_t A;};uint16_t AF; };
 union{struct{uint8_t C; uint8_t B;};uint16_t BC; };
 union{struct{uint8_t E; uint8_t D;};uint16_t DE; };
 union{struct{uint8_t L; uint8_t H;};uint16_t HL; };
+
 //Shadow Registers
 union{struct{uint8_t Fp; uint8_t Ap;};uint16_t AFp; };
 union{struct{uint8_t Cp; uint8_t Bp;};uint16_t BCp; };
@@ -48,7 +49,7 @@ union{struct{uint8_t Lp; uint8_t Hp;};uint16_t HLp; };
   //Functions
   uint8_t (*readByte)(void* ,uint16_t);
   void (*writeByte)(void* ,uint16_t, uint8_t);
-  int (*in)(void*, uint8_t);
+  uint8_t (*in)(void*, uint16_t);
   void (*out)(void*, uint16_t, uint8_t);
 } cpu_t;
 void runOpcode(cpu_t* z80, uint8_t opcode);
