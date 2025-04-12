@@ -12,6 +12,7 @@ void zexInit(uint8_t* buffer, size_t size){
   }
 }
 void memWrite(void* unused, uint16_t addr ,uint8_t data) {
+  //fprintf(stderr, "0x%X written to 0x%X\n", data, addr);
   ram[addr] = data;
 }
 
@@ -19,6 +20,7 @@ void memWrite(void* unused, uint16_t addr ,uint8_t data) {
   return ram[addr];
 }
 void out(cpu_t *z80, uint16_t addr, uint8_t data){
+  printf("DEATH!!!\n");
   exit(0);
 }
 uint8_t in(cpu_t *z80, uint16_t addr){
@@ -44,7 +46,7 @@ void zexStep() {
   z80.PC = 0x100;
   z80.cycles = 1;
   for (;;) {   
-/*    fprintf(stderr, "PC: 0x%X, 3 bytes after PC: 0x%X 0x%X 0x%X\n", z80.PC, memRead(NULL, z80.PC), memRead(NULL, z80.PC + 1), memRead(NULL, z80.PC + 2));
+  /*fprintf(stderr, "PC: 0x%X, 3 bytes after PC: 0x%X 0x%X 0x%X\n", z80.PC, memRead(NULL, z80.PC), memRead(NULL, z80.PC + 1), memRead(NULL, z80.PC + 2));
     fprintf(stderr, "Cycles: %lld A: 0x%02X  B: 0x%02X C: 0x%02X  D: 0x%02X E: 0x%02X  H: 0x%02X L: 0x%02X SP: 0x%02X\n",
       z80.cycles, z80.A,
       z80.B, z80.C,  
