@@ -11,22 +11,22 @@ bool success = true;
 uint8_t ram[0xFFFF];
 struct json_array_s *expectedPorts = NULL;
 
-void writeMem(void* unused, uint16_t addr,  uint8_t data) {
+void writeMem(void *unused, uint16_t addr, uint8_t data) {
   ram[addr] = data;
 }
 
-uint8_t readMem(void* unused, uint16_t addr) {
+uint8_t readMem(void *unused, uint16_t addr) {
   return ram[addr];
 }
 
-uint8_t input(void* unused, uint16_t addr){
-  if(atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->value)->number) == addr){
+uint8_t input(void *unused, uint16_t addr) {
+  if (atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->value)->number) == addr) {
     return atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->next->value)->number);
   }
-  printf("Failed, The expecte addres is 0x%X but got %d instead\n", addr, atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->value)->number));
+  printf("Failed, The expected addres is 0x%X but got 0x%X instead \n", addr, atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->value)->number));
   return 0xEA;
 }
-void output(void* unused, uint16_t addr, uint8_t data){
+void output(void *unused, uint16_t addr, uint8_t data) {
   address = atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->value)->number);
   datas = atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->next->value)->number);
   return;
@@ -105,14 +105,12 @@ void jsonStep(struct json_array_element_s *myTests) {
     int address = atoi(json_value_as_number(firstValue)->number);
     int value = atoi(json_value_as_number(secondValue)->number);
     // printf("Ram address 0x%X and value is 0x%X\n", address, value);
-    writeMem(NULL,address, value);
+    writeMem(NULL, address, value);
     i++;
   }
 
-
-  //STEP
+  // STEP
   cpuStep(&z80);
-
 
   struct json_object_element_s *finalObjects = expectedFinalValue->start;
   int actual = 0;
@@ -154,18 +152,16 @@ void jsonStep(struct json_array_element_s *myTests) {
         if (strcmp(finalRegisters[j].name, "F") != 0) {
           printf("Fail: Expected value for %s is 0x%X, Actual value for %s is 0x%X on test %s\n", finalObjects->name->string, atoi(json_value_as_number(finalObjects->value)->number), finalRegisters[j].name, actual, name->string);
         } else {
-          if((actual & 0xD7) == (expected & 0xD7)){
+          if ((actual & 0xD7) == (expected & 0xD7)) {
             finalObjects = finalObjects->next;
             j++;
             continue;
-            //goto ramCheck;
           }
           printf("Fail: Expected value for %s is " BYTE_TO_BINARY_PATTERN ", Actual value for %s is " BYTE_TO_BINARY_PATTERN " Diffrence is " BYTE_TO_BINARY_PATTERN " on test %s\n", finalObjects->name->string, BYTE_TO_BINARY(atoi(json_value_as_number(finalObjects->value)->number)), finalRegisters[j].name, BYTE_TO_BINARY(actual), BYTE_TO_BINARY(actual ^ (atoi(json_value_as_number(finalObjects->value)->number))), name->string);
           printf("                                                                                    ^^^^^^^^\n");
           printf("                                                                                    SZ5H3PNC\n");
         }
         success = false;
-        exit(0);
       }
       j++;
     }
@@ -185,8 +181,10 @@ void jsonStep(struct json_array_element_s *myTests) {
     if (expectedValue != actualValue) {
       printf("RAM Test Fail: Expected value at 0x%X is 0x%X, Actual value is 0x%X on test %s\n", address, expectedValue, actualValue, name->string);
       success = false;
-      exit(0);
     }
     ramCheckIndex++;
+  }
+  if (!success) {
+    exit(0);
   }
 }
