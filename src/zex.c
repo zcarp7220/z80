@@ -1,6 +1,6 @@
 #include "common.h"
 #include "z80.h"
-uint8_t zexRam[0xFFFF];
+uint8_t zexRam[0x10000];
 void zexInit(uint8_t *buffer, size_t size) {
   zexRam[0x0000] = 0xD3;
   zexRam[0x0001] = 0x00;
@@ -20,8 +20,7 @@ uint8_t memRead(void *unused, uint16_t addr) {
   return zexRam[addr];
 }
 void out(cpu_t *z80, uint16_t addr, uint8_t data) {
-  printf("DEATH!!!\n");
-  exit(0);
+    exit(0);
 }
 uint8_t in(cpu_t *z80, uint16_t addr) {
   int varible = addr + z80->A;
@@ -43,7 +42,7 @@ void zexStep() {
   z80.writeByte = memWrite;
   z80.out = out;
   z80.in = in;
-  z80.PC = 0x100;
+  z80.PC = 0x99;
   z80.cycles = 1;
   for (;;) {
     //  if (z80.cycles > 5680749720) {
