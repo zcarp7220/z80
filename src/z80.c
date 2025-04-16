@@ -484,11 +484,11 @@ void jp(cpu_t *z80, bool input) {
     z80->PC += 3;
   }
 }
-void undocCbPrefix(cpu_t *z80, uint8_t *input) {
+void undocCbPrefix(cpu_t *z80, uint8_t *input, uint16_t index_Displacment) {
   ss2 = z80->PC + 2;
-  *input = readMem(z80, ss1);
+  *input = readMem(z80, index_Displacment);
   bitInstructions(z80, readMem(z80, ss2));
-  writeMem(z80, ss1, *input);
+  writeMem(z80, index_Displacment, *input);
 }
 void ini(cpu_t *z80){
   ss2 = in(z80, z80->BC);
@@ -539,36 +539,35 @@ void prefixInst(cpu_t *z80) {
       z80->PC += 2;
     } else {
       switch (readMem(z80, z80->PC + 2) & 7) {
-      case 0:
-        undocCbPrefix(z80, &z80->B);
+       case 0:
+        undocCbPrefix(z80, &z80->B, ss1);
         break;
       case 1:
-        undocCbPrefix(z80, &z80->C);
+        undocCbPrefix(z80, &z80->C, ss1);
         break;
       case 2:
-        undocCbPrefix(z80, &z80->D);
+        undocCbPrefix(z80, &z80->D, ss1);
         break;
       case 3:
-        undocCbPrefix(z80, &z80->E);
+        undocCbPrefix(z80, &z80->E, ss1);
         break;
       case 4:
         tempStorage = z80->H;
-        undocCbPrefix(z80, &z80->H);
+        undocCbPrefix(z80, &z80->H, ss1);
         hlStorage = (z80->H << 8) | (hlStorage & 0xFF);
         z80->H = tempStorage;
         break;
       case 5:
         tempStorage = z80->L;
-        undocCbPrefix(z80, &z80->L);
+        undocCbPrefix(z80, &z80->L, ss1);
         hlStorage = (z80->L) | (hlStorage & 0xFF00);
         z80->L = tempStorage;
         break;
       case 6:
         bitInstructions(z80, readMem(z80, z80->PC + 2));
-        z80->PC -= 1;
         break;
       case 7:
-        undocCbPrefix(z80, &z80->A);
+        undocCbPrefix(z80, &z80->A, ss1);
         break;
       }
       z80->PC += 2;
@@ -1415,8 +1414,18 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
   }
 }
 void bitInstructions(cpu_t *z80, uint8_t opcode) {
-  uint8_t memAtHL = readMem(z80, z80->HL);
-  ss1 = z80->HL;
+  uint8_t memAtHL;
+  bool isHlIndex;
+  uint16_t var = 0;
+  if(((opcode & 0xF) == 0x6) || ((opcode & 0xF )== 0xE)){
+    isHlIndex = true;
+    memAtHL = readMem(z80, z80->HL);
+    var = z80->HL;
+   }
+   if(isHlIndex && isHL_IX_IY){
+    var = z80->HL + (int8_t)displacment;
+    memAtHL = readMem(z80, var);
+   }
   incR(z80);
   uint8_t *registers[8] = {&z80->B, &z80->C, &z80->D, &z80->E, &z80->H, &z80->L, &memAtHL, &z80->A};
   void (*shiftFunctions[4]) (cpu_t *z80, char direction, void *val) = {rotateC, rotate, shift, logicalShift};
@@ -1430,7 +1439,9 @@ void bitInstructions(cpu_t *z80, uint8_t opcode) {
   }else{
     bitFunctions[(opcode - 0x40) / 64] (z80,  ((opcode - 0x40) % 64) / 8, registers[opcode % 8]);
   }
-  writeMem(z80, ss1, memAtHL);
+    if(isHlIndex){
+    writeMem(z80, var, memAtHL);
+   }
 }
 void miscInstructions(cpu_t *z80, uint8_t opcode) {
   incR(z80);
