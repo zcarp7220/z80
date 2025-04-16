@@ -27,8 +27,13 @@ uint8_t input(void *unused, uint16_t addr) {
   return 0xEA;
 }
 void output(void *unused, uint16_t addr, uint8_t data) {
-  address = atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->value)->number);
-  datas = atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->next->value)->number);
+  if (atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->value)->number) != addr){
+    printf("Addr(0x%X) doesnt line up with expected(0x%X) value\n", addr, atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->value)->number));
+  }
+  if(atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->next->value)->number) != data){
+    printf("Data(0x%X) doesnt line up with expected(0x%X) value \n", data, atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->next->value)->number));
+  }
+  exit(0);
   return;
 }
 void set_value(void *var, const char *value, char type) {

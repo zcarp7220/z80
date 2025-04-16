@@ -23,7 +23,6 @@ void out(cpu_t *z80, uint16_t addr, uint8_t data) {
     exit(0);
 }
 uint8_t in(cpu_t *z80, uint16_t addr) {
-  int varible = addr + z80->A;
   if (z80->C == 2) {
     printf("%c", z80->E);
   } else if (z80->C == 9) {
@@ -45,14 +44,11 @@ void zexStep() {
   z80.PC = 0x99;
   z80.cycles = 1;
   for (;;) {
-    //  if (z80.cycles > 5680749720) {
-    //    fprintf(stderr, "PC: 0x%X, 3 bytes after PC: 0x%X 0x%X 0x%X\n", z80.PC, memRead(NULL, z80.PC), memRead(NULL, z80.PC + 1), memRead(NULL, z80.PC + 2));
-    //     fprintf(stderr, "Cycles: %lld A: 0x%02X  B: 0x%02X C: 0x%02X  D: 0x%02X E: 0x%02X  H: 0x%02X L: 0x%02X SP: 0x%02X\n",
-    //             z80.cycles, z80.A,
-    //             z80.B, z80.C,
-    //             z80.D, z80.E,
-    //             z80.H, z80.L, z80.SP);
-    //   }
+   // fprintf(stderr, "PC:%X A:%02X F:%02X  B:%02X C:%02X  D:%02X E:%02X  H:%02X L:%02X P:%02X\n",
+   //        z80.PC, z80.A, z80.F,
+   //         z80.B, z80.C,
+   //         z80.D, z80.E,
+   //         z80.H, z80.L, z80.SP);
 
     cpuStep(&z80);
   }

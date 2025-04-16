@@ -27,7 +27,7 @@ static inline uint8_t in(cpu_t *const z, uint16_t addr) {
   z->PC += 1;
   return z->in(z, addr);
 }
-static inline void out(cpu_t *const z, uint8_t data, uint16_t addr) {
+static inline void out(cpu_t *const z, uint16_t addr, uint8_t data) {
   z->PC += 1;
   z->out(z, addr, data);
 }
@@ -311,7 +311,7 @@ static inline void shift(cpu_t *z80, char direction, void *val) {
   z80->PC += 1;
 }
 
-static inline void logicalshift(cpu_t *z80, char direction, void *val) {
+static inline void logicalShift(cpu_t *z80, char direction, void *val) {
   int result = 0;
   clearFlag(z80, Z80_HF);
   clearFlag(z80, Z80_NF);
@@ -332,8 +332,8 @@ static inline void logicalshift(cpu_t *z80, char direction, void *val) {
   *(uint8_t *)val = result;
   z80->PC += 1;
 }
-static inline void bit(cpu_t *z80, int pos, uint8_t ss2) {
-  uint8_t value = ss2;
+static inline void bit(cpu_t *z80, int pos, uint8_t *ss2) {
+  uint8_t value = *ss2;
   int result = value & (1 << (pos));
   clearFlag(z80, Z80_NF);
   setFlag(z80, Z80_HF);
@@ -345,13 +345,13 @@ static inline void bit(cpu_t *z80, int pos, uint8_t ss2) {
   z80->PC += 1;
 }
 
-static inline void set(cpu_t *z80, int pos, void *ss2) {
-  *(uint8_t *)ss2 |= (1 << pos);
+static inline void set(cpu_t *z80, int pos, uint8_t *ss2) {
+  *ss2 |= (1 << pos);
   z80->PC += 1;
 }
 
-static inline void reset(cpu_t *z80, int pos, void *ss2) {
-  *(uint8_t *)ss2 &= ~(1 << pos);
+static inline void reset(cpu_t *z80, int pos, uint8_t *ss2) {
+  *ss2 &= ~(1 << pos);
   z80->PC += 1;
 }
 static inline void exchangeRegisters(cpu_t *z80, uint16_t *A, uint16_t *B) {
@@ -500,7 +500,7 @@ void ini(cpu_t *z80){
   checkSet(Z80_HF | Z80_CF, (ss2 + ((z80->C + 1) & 255) > 255));
   checkSet(Z80_PF, getParity(((ss2 + ((z80->C + 1) & 255)) & 7) ^ z80->B));
 }
-void postINI_OUTI_R(cpu_t *z80, uint8_t data){
+static inline void postINI_OUTI_R(cpu_t *z80, uint8_t data){
     //I guess this is right, source 
     //https://github.com/hoglet67/Z80Decoder/wiki/Undocumented-Flags
     checkSet(Z80_F5, ((z80->PC - 2) >> 11) & 1);
@@ -517,6 +517,13 @@ void postINI_OUTI_R(cpu_t *z80, uint8_t data){
         checkSet(Z80_PF, readFlag(z80, Z80_PF) ^ getParity(z80->B & 7) ^ 1);
     }
 }
+void addHL(cpu_t *z80, int input){
+  add(z80, z80->L, input & 0xF, &ss1, 'b', readFlag(z80, Z80_CF));
+  add(z80, z80->H, (input & 0xF0) >> 8, &ss2,'b', readFlag(z80, Z80_CF));
+  z80->HL = ss1 | ss2 << 8;
+  checkSet(Z80_ZF, z80->HL == 0);
+  z80->PC -= 1;
+}
 void prefixInst(cpu_t *z80) {
   z80->PC += 1;
   displacment = readMem(z80, z80->PC + 1);
@@ -526,8 +533,9 @@ void prefixInst(cpu_t *z80) {
     ss1 = z80->HL + (int8_t)displacment;
     if (readMem(z80, z80->PC + 2) >= 0x40 &&
         readMem(z80, z80->PC + 2) <= 0x7F) {
+          uint8_t temp = readMem(z80, ss1);
       incR(z80);
-      bit(z80, (readMem(z80, z80->PC + 2) - 0x40) / 8, readMem(z80, ss1));
+      bit(z80, (readMem(z80, z80->PC + 2) - 0x40) / 8, &temp);
       z80->PC += 2;
     } else {
       switch (readMem(z80, z80->PC + 2) & 7) {
@@ -1407,777 +1415,22 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
   }
 }
 void bitInstructions(cpu_t *z80, uint8_t opcode) {
+  uint8_t memAtHL = readMem(z80, z80->HL);
+  ss1 = z80->HL;
   incR(z80);
-  switch (opcode) {
-  case 0x0:
-    rotateC(z80, 'l', &z80->B);
-    break;
-  case 0x1:
-    rotateC(z80, 'l', &z80->C);
-    break;
-  case 0x2:
-    rotateC(z80, 'l', &z80->D);
-    break;
-  case 0x3:
-    rotateC(z80, 'l', &z80->E);
-    break;
-  case 0x4:
-    rotateC(z80, 'l', &z80->H);
-    break;
-  case 0x5:
-    rotateC(z80, 'l', &z80->L);
-    break;
-  case 0x6:
-    HLASINDEX(rotateC(z80, 'l', &z80->HL));
-    break;
-  case 0x7:
-    rotateC(z80, 'l', &z80->A);
-    break;
-  case 0x8:
-    rotateC(z80, 'r', &z80->B);
-    break;
-  case 0x9:
-    rotateC(z80, 'r', &z80->C);
-    break;
-  case 0xa:
-    rotateC(z80, 'r', &z80->D);
-    break;
-  case 0xb:
-    rotateC(z80, 'r', &z80->E);
-    break;
-  case 0xc:
-    rotateC(z80, 'r', &z80->H);
-    break;
-  case 0xd:
-    rotateC(z80, 'r', &z80->L);
-    break;
-  case 0xe:
-    HLASINDEX(rotateC(z80, 'r', &z80->HL));
-    break;
-  case 0xf:
-    rotateC(z80, 'r', &z80->A);
-    break;
-  case 0x10:
-    rotate(z80, 'l', &z80->B);
-    break;
-  case 0x11:
-    rotate(z80, 'l', &z80->C);
-    break;
-  case 0x12:
-    rotate(z80, 'l', &z80->D);
-    break;
-  case 0x13:
-    rotate(z80, 'l', &z80->E);
-    break;
-  case 0x14:
-    rotate(z80, 'l', &z80->H);
-    break;
-  case 0x15:
-    rotate(z80, 'l', &z80->L);
-    break;
-  case 0x16:
-    HLASINDEX(rotate(z80, 'l', &z80->HL));
-    break;
-  case 0x17:
-    rotate(z80, 'l', &z80->A);
-    break;
-  case 0x18:
-    rotate(z80, 'r', &z80->B);
-    break;
-  case 0x19:
-    rotate(z80, 'r', &z80->C);
-    break;
-  case 0x1a:
-    rotate(z80, 'r', &z80->D);
-    break;
-  case 0x1b:
-    rotate(z80, 'r', &z80->E);
-    break;
-  case 0x1c:
-    rotate(z80, 'r', &z80->H);
-    break;
-  case 0x1d:
-    rotate(z80, 'r', &z80->L);
-    break;
-  case 0x1e:
-    HLASINDEX(rotate(z80, 'r', &z80->HL));
-    break;
-  case 0x1f:
-    rotate(z80, 'r', &z80->A);
-    break;
-  case 0x20:
-    shift(z80, 'l', &z80->B);
-    break;
-  case 0x21:
-    shift(z80, 'l', &z80->C);
-    break;
-  case 0x22:
-    shift(z80, 'l', &z80->D);
-    break;
-  case 0x23:
-    shift(z80, 'l', &z80->E);
-    break;
-  case 0x24:
-    shift(z80, 'l', &z80->H);
-    break;
-  case 0x25:
-    shift(z80, 'l', &z80->L);
-    break;
-  case 0x26:
-    HLASINDEX(shift(z80, 'l', &z80->HL));
-    break;
-  case 0x27:
-    shift(z80, 'l', &z80->A);
-    break;
-  case 0x28:
-    shift(z80, 'r', &z80->B);
-    break;
-  case 0x29:
-    shift(z80, 'r', &z80->C);
-    break;
-  case 0x2a:
-    shift(z80, 'r', &z80->D);
-    break;
-  case 0x2b:
-    shift(z80, 'r', &z80->E);
-    break;
-  case 0x2c:
-    shift(z80, 'r', &z80->H);
-    break;
-  case 0x2d:
-    shift(z80, 'r', &z80->L);
-    break;
-  case 0x2e:
-    HLASINDEX(shift(z80, 'r', &z80->HL));
-    break;
-  case 0x2f:
-    shift(z80, 'r', &z80->A);
-    break;
-  case 0x30:
-    logicalshift(z80, 'l', &z80->B);
-    break;
-  case 0x31:
-    logicalshift(z80, 'l', &z80->C);
-    break;
-  case 0x32:
-    logicalshift(z80, 'l', &z80->D);
-    break;
-  case 0x33:
-    logicalshift(z80, 'l', &z80->E);
-    break;
-  case 0x34:
-    logicalshift(z80, 'l', &z80->H);
-    break;
-  case 0x35:
-    logicalshift(z80, 'l', &z80->L);
-    break;
-  case 0x36:
-    HLASINDEX(logicalshift(z80, 'l', &z80->HL));
-    break;
-  case 0x37:
-    logicalshift(z80, 'l', &z80->A);
-    break;
-  case 0x38:
-    logicalshift(z80, 'r', &z80->B);
-    break;
-  case 0x39:
-    logicalshift(z80, 'r', &z80->C);
-    break;
-  case 0x3a:
-    logicalshift(z80, 'r', &z80->D);
-    break;
-  case 0x3b:
-    logicalshift(z80, 'r', &z80->E);
-    break;
-  case 0x3c:
-    logicalshift(z80, 'r', &z80->H);
-    break;
-  case 0x3d:
-    logicalshift(z80, 'r', &z80->L);
-    break;
-  case 0x3e:
-    HLASINDEX(logicalshift(z80, 'r', &z80->HL));
-    break;
-  case 0x3f:
-    logicalshift(z80, 'r', &z80->A);
-    break;
-  case 0x40:
-    bit(z80, 0, z80->B);
-    break;
-  case 0x41:
-    bit(z80, 0, z80->C);
-    break;
-  case 0x42:
-    bit(z80, 0, z80->D);
-    break;
-  case 0x43:
-    bit(z80, 0, z80->E);
-    break;
-  case 0x44:
-    bit(z80, 0, z80->H);
-    break;
-  case 0x45:
-    bit(z80, 0, z80->L);
-    break;
-  case 0x46:
-    HLASINDEX(bit(z80, 0, z80->HL));
-    break;
-  case 0x47:
-    bit(z80, 0, z80->A);
-    break;
-  case 0x48:
-    bit(z80, 1, z80->B);
-    break;
-  case 0x49:
-    bit(z80, 1, z80->C);
-    break;
-  case 0x4a:
-    bit(z80, 1, z80->D);
-    break;
-  case 0x4b:
-    bit(z80, 1, z80->E);
-    break;
-  case 0x4c:
-    bit(z80, 1, z80->H);
-    break;
-  case 0x4d:
-    bit(z80, 1, z80->L);
-    break;
-  case 0x4e:
-    HLASINDEX(bit(z80, 1, z80->HL));
-    break;
-  case 0x4f:
-    bit(z80, 1, z80->A);
-    break;
-  case 0x50:
-    bit(z80, 2, z80->B);
-    break;
-  case 0x51:
-    bit(z80, 2, z80->C);
-    break;
-  case 0x52:
-    bit(z80, 2, z80->D);
-    break;
-  case 0x53:
-    bit(z80, 2, z80->E);
-    break;
-  case 0x54:
-    bit(z80, 2, z80->H);
-    break;
-  case 0x55:
-    bit(z80, 2, z80->L);
-    break;
-  case 0x56:
-    HLASINDEX(bit(z80, 2, z80->HL));
-    break;
-  case 0x57:
-    bit(z80, 2, z80->A);
-    break;
-  case 0x58:
-    bit(z80, 3, z80->B);
-    break;
-  case 0x59:
-    bit(z80, 3, z80->C);
-    break;
-  case 0x5a:
-    bit(z80, 3, z80->D);
-    break;
-  case 0x5b:
-    bit(z80, 3, z80->E);
-    break;
-  case 0x5c:
-    bit(z80, 3, z80->H);
-    break;
-  case 0x5d:
-    bit(z80, 3, z80->L);
-    break;
-  case 0x5e:
-    HLASINDEX(bit(z80, 3, z80->HL));
-    break;
-  case 0x5f:
-    bit(z80, 3, z80->A);
-    break;
-  case 0x60:
-    bit(z80, 4, z80->B);
-    break;
-  case 0x61:
-    bit(z80, 4, z80->C);
-    break;
-  case 0x62:
-    bit(z80, 4, z80->D);
-    break;
-  case 0x63:
-    bit(z80, 4, z80->E);
-    break;
-  case 0x64:
-    bit(z80, 4, z80->H);
-    break;
-  case 0x65:
-    bit(z80, 4, z80->L);
-    break;
-  case 0x66:
-    HLASINDEX(bit(z80, 4, z80->HL));
-    break;
-  case 0x67:
-    bit(z80, 4, z80->A);
-    break;
-  case 0x68:
-    bit(z80, 5, z80->B);
-    break;
-  case 0x69:
-    bit(z80, 5, z80->C);
-    break;
-  case 0x6a:
-    bit(z80, 5, z80->D);
-    break;
-  case 0x6b:
-    bit(z80, 5, z80->E);
-    break;
-  case 0x6c:
-    bit(z80, 5, z80->H);
-    break;
-  case 0x6d:
-    bit(z80, 5, z80->L);
-    break;
-  case 0x6e:
-    HLASINDEX(bit(z80, 5, z80->HL));
-    break;
-  case 0x6f:
-    bit(z80, 5, z80->A);
-    break;
-  case 0x70:
-    bit(z80, 6, z80->B);
-    break;
-  case 0x71:
-    bit(z80, 6, z80->C);
-    break;
-  case 0x72:
-    bit(z80, 6, z80->D);
-    break;
-  case 0x73:
-    bit(z80, 6, z80->E);
-    break;
-  case 0x74:
-    bit(z80, 6, z80->H);
-    break;
-  case 0x75:
-    bit(z80, 6, z80->L);
-    break;
-  case 0x76:
-    HLASINDEX(bit(z80, 6, z80->HL));
-    break;
-  case 0x77:
-    bit(z80, 6, z80->A);
-    break;
-  case 0x78:
-    bit(z80, 7, z80->B);
-    break;
-  case 0x79:
-    bit(z80, 7, z80->C);
-    break;
-  case 0x7a:
-    bit(z80, 7, z80->D);
-    break;
-  case 0x7b:
-    bit(z80, 7, z80->E);
-    break;
-  case 0x7c:
-    bit(z80, 7, z80->H);
-    break;
-  case 0x7d:
-    bit(z80, 7, z80->L);
-    break;
-  case 0x7e:
-    HLASINDEX(bit(z80, 7, z80->HL));
-    break;
-  case 0x7f:
-    bit(z80, 7, z80->A);
-    break;
-  case 0x80:
-    reset(z80, 0, &z80->B);
-    break;
-  case 0x81:
-    reset(z80, 0, &z80->C);
-    break;
-  case 0x82:
-    reset(z80, 0, &z80->D);
-    break;
-  case 0x83:
-    reset(z80, 0, &z80->E);
-    break;
-  case 0x84:
-    reset(z80, 0, &z80->H);
-    break;
-  case 0x85:
-    reset(z80, 0, &z80->L);
-    break;
-  case 0x86:
-    HLASINDEX(reset(z80, 0, &z80->HL));
-    break;
-  case 0x87:
-    reset(z80, 0, &z80->A);
-    break;
-  case 0x88:
-    reset(z80, 1, &z80->B);
-    break;
-  case 0x89:
-    reset(z80, 1, &z80->C);
-    break;
-  case 0x8a:
-    reset(z80, 1, &z80->D);
-    break;
-  case 0x8b:
-    reset(z80, 1, &z80->E);
-    break;
-  case 0x8c:
-    reset(z80, 1, &z80->H);
-    break;
-  case 0x8d:
-    reset(z80, 1, &z80->L);
-    break;
-  case 0x8e:
-    HLASINDEX(reset(z80, 1, &z80->HL));
-    break;
-  case 0x8f:
-    reset(z80, 1, &z80->A);
-    break;
-  case 0x90:
-    reset(z80, 2, &z80->B);
-    break;
-  case 0x91:
-    reset(z80, 2, &z80->C);
-    break;
-  case 0x92:
-    reset(z80, 2, &z80->D);
-    break;
-  case 0x93:
-    reset(z80, 2, &z80->E);
-    break;
-  case 0x94:
-    reset(z80, 2, &z80->H);
-    break;
-  case 0x95:
-    reset(z80, 2, &z80->L);
-    break;
-  case 0x96:
-    HLASINDEX(reset(z80, 2, &z80->HL));
-    break;
-  case 0x97:
-    reset(z80, 2, &z80->A);
-    break;
-  case 0x98:
-    reset(z80, 3, &z80->B);
-    break;
-  case 0x99:
-    reset(z80, 3, &z80->C);
-    break;
-  case 0x9a:
-    reset(z80, 3, &z80->D);
-    break;
-  case 0x9b:
-    reset(z80, 3, &z80->E);
-    break;
-  case 0x9c:
-    reset(z80, 3, &z80->H);
-    break;
-  case 0x9d:
-    reset(z80, 3, &z80->L);
-    break;
-  case 0x9e:
-    HLASINDEX(reset(z80, 3, &z80->HL));
-    break;
-  case 0x9f:
-    reset(z80, 3, &z80->A);
-    break;
-  case 0xa0:
-    reset(z80, 4, &z80->B);
-    break;
-  case 0xa1:
-    reset(z80, 4, &z80->C);
-    break;
-  case 0xa2:
-    reset(z80, 4, &z80->D);
-    break;
-  case 0xa3:
-    reset(z80, 4, &z80->E);
-    break;
-  case 0xa4:
-    reset(z80, 4, &z80->H);
-    break;
-  case 0xa5:
-    reset(z80, 4, &z80->L);
-    break;
-  case 0xa6:
-    HLASINDEX(reset(z80, 4, &z80->HL));
-    break;
-  case 0xa7:
-    reset(z80, 4, &z80->A);
-    break;
-  case 0xa8:
-    reset(z80, 5, &z80->B);
-    break;
-  case 0xa9:
-    reset(z80, 5, &z80->C);
-    break;
-  case 0xaa:
-    reset(z80, 5, &z80->D);
-    break;
-  case 0xab:
-    reset(z80, 5, &z80->E);
-    break;
-  case 0xac:
-    reset(z80, 5, &z80->H);
-    break;
-  case 0xad:
-    reset(z80, 5, &z80->L);
-    break;
-  case 0xae:
-    HLASINDEX(reset(z80, 5, &z80->HL));
-    break;
-  case 0xaf:
-    reset(z80, 5, &z80->A);
-    break;
-  case 0xb0:
-    reset(z80, 6, &z80->B);
-    break;
-  case 0xb1:
-    reset(z80, 6, &z80->C);
-    break;
-  case 0xb2:
-    reset(z80, 6, &z80->D);
-    break;
-  case 0xb3:
-    reset(z80, 6, &z80->E);
-    break;
-  case 0xb4:
-    reset(z80, 6, &z80->H);
-    break;
-  case 0xb5:
-    reset(z80, 6, &z80->L);
-    break;
-  case 0xb6:
-    HLASINDEX(reset(z80, 6, &z80->HL));
-    break;
-  case 0xb7:
-    reset(z80, 6, &z80->A);
-    break;
-  case 0xb8:
-    reset(z80, 7, &z80->B);
-    break;
-  case 0xb9:
-    reset(z80, 7, &z80->C);
-    break;
-  case 0xba:
-    reset(z80, 7, &z80->D);
-    break;
-  case 0xbb:
-    reset(z80, 7, &z80->E);
-    break;
-  case 0xbc:
-    reset(z80, 7, &z80->H);
-    break;
-  case 0xbd:
-    reset(z80, 7, &z80->L);
-    break;
-  case 0xbe:
-    HLASINDEX(reset(z80, 7, &z80->HL));
-    break;
-  case 0xbf:
-    reset(z80, 7, &z80->A);
-    break;
-  case 0xc0:
-    set(z80, 0, &z80->B);
-    break;
-  case 0xc1:
-    set(z80, 0, &z80->C);
-    break;
-  case 0xc2:
-    set(z80, 0, &z80->D);
-    break;
-  case 0xc3:
-    set(z80, 0, &z80->E);
-    break;
-  case 0xc4:
-    set(z80, 0, &z80->H);
-    break;
-  case 0xc5:
-    set(z80, 0, &z80->L);
-    break;
-  case 0xc6:
-    HLASINDEX(set(z80, 0, &z80->HL));
-    break;
-  case 0xc7:
-    set(z80, 0, &z80->A);
-    break;
-  case 0xc8:
-    set(z80, 1, &z80->B);
-    break;
-  case 0xc9:
-    set(z80, 1, &z80->C);
-    break;
-  case 0xca:
-    set(z80, 1, &z80->D);
-    break;
-  case 0xcb:
-    set(z80, 1, &z80->E);
-    break;
-  case 0xcc:
-    set(z80, 1, &z80->H);
-    break;
-  case 0xcd:
-    set(z80, 1, &z80->L);
-    break;
-  case 0xce:
-    HLASINDEX(set(z80, 1, &z80->HL));
-    break;
-  case 0xcf:
-    set(z80, 1, &z80->A);
-    break;
-  case 0xd0:
-    set(z80, 2, &z80->B);
-    break;
-  case 0xd1:
-    set(z80, 2, &z80->C);
-    break;
-  case 0xd2:
-    set(z80, 2, &z80->D);
-    break;
-  case 0xd3:
-    set(z80, 2, &z80->E);
-    break;
-  case 0xd4:
-    set(z80, 2, &z80->H);
-    break;
-  case 0xd5:
-    set(z80, 2, &z80->L);
-    break;
-  case 0xd6:
-    HLASINDEX(set(z80, 2, &z80->HL));
-    break;
-  case 0xd7:
-    set(z80, 2, &z80->A);
-    break;
-  case 0xd8:
-    set(z80, 3, &z80->B);
-    break;
-  case 0xd9:
-    set(z80, 3, &z80->C);
-    break;
-  case 0xda:
-    set(z80, 3, &z80->D);
-    break;
-  case 0xdb:
-    set(z80, 3, &z80->E);
-    break;
-  case 0xdc:
-    set(z80, 3, &z80->H);
-    break;
-  case 0xdd:
-    set(z80, 3, &z80->L);
-    break;
-  case 0xde:
-    HLASINDEX(set(z80, 3, &z80->HL));
-    break;
-  case 0xdf:
-    set(z80, 3, &z80->A);
-    break;
-  case 0xe0:
-    set(z80, 4, &z80->B);
-    break;
-  case 0xe1:
-    set(z80, 4, &z80->C);
-    break;
-  case 0xe2:
-    set(z80, 4, &z80->D);
-    break;
-  case 0xe3:
-    set(z80, 4, &z80->E);
-    break;
-  case 0xe4:
-    set(z80, 4, &z80->H);
-    break;
-  case 0xe5:
-    set(z80, 4, &z80->L);
-    break;
-  case 0xe6:
-    HLASINDEX(set(z80, 4, &z80->HL));
-    break;
-  case 0xe7:
-    set(z80, 4, &z80->A);
-    break;
-  case 0xe8:
-    set(z80, 5, &z80->B);
-    break;
-  case 0xe9:
-    set(z80, 5, &z80->C);
-    break;
-  case 0xea:
-    set(z80, 5, &z80->D);
-    break;
-  case 0xeb:
-    set(z80, 5, &z80->E);
-    break;
-  case 0xec:
-    set(z80, 5, &z80->H);
-    break;
-  case 0xed:
-    set(z80, 5, &z80->L);
-    break;
-  case 0xee:
-    HLASINDEX(set(z80, 5, &z80->HL));
-    break;
-  case 0xef:
-    set(z80, 5, &z80->A);
-    break;
-  case 0xf0:
-    set(z80, 6, &z80->B);
-    break;
-  case 0xf1:
-    set(z80, 6, &z80->C);
-    break;
-  case 0xf2:
-    set(z80, 6, &z80->D);
-    break;
-  case 0xf3:
-    set(z80, 6, &z80->E);
-    break;
-  case 0xf4:
-    set(z80, 6, &z80->H);
-    break;
-  case 0xf5:
-    set(z80, 6, &z80->L);
-    break;
-  case 0xf6:
-    HLASINDEX(set(z80, 6, &z80->HL));
-    break;
-  case 0xf7:
-    set(z80, 6, &z80->A);
-    break;
-  case 0xf8:
-    set(z80, 7, &z80->B);
-    break;
-  case 0xf9:
-    set(z80, 7, &z80->C);
-    break;
-  case 0xfa:
-    set(z80, 7, &z80->D);
-    break;
-  case 0xfb:
-    set(z80, 7, &z80->E);
-    break;
-  case 0xfc:
-    set(z80, 7, &z80->H);
-    break;
-  case 0xfd:
-    set(z80, 7, &z80->L);
-    break;
-  case 0xfe:
-    HLASINDEX(set(z80, 7, &z80->HL));
-    break;
-  case 0xff:
-    set(z80, 7, &z80->A);
-    break;
+  uint8_t *registers[8] = {&z80->B, &z80->C, &z80->D, &z80->E, &z80->H, &z80->L, &memAtHL, &z80->A};
+  void (*shiftFunctions[4]) (cpu_t *z80, char direction, void *val) = {rotateC, rotate, shift, logicalShift};
+  void (*bitFunctions[3]) (cpu_t *z80, int pos, uint8_t *ss2) = {bit, reset, set};
+  if(opcode < 0x40){
+    if((opcode & 0xF) > 0x7){
+      shiftFunctions[opcode / 16](z80, 'r', registers[opcode % 8]);
+    }else{
+      shiftFunctions[opcode / 16](z80, 'l', registers[opcode % 8]);
+    }
+  }else{
+    bitFunctions[(opcode - 0x40) / 64] (z80,  ((opcode - 0x40) % 64) / 8, registers[opcode % 8]);
   }
+  writeMem(z80, ss1, memAtHL);
 }
 void miscInstructions(cpu_t *z80, uint8_t opcode) {
   incR(z80);
@@ -2192,7 +1445,7 @@ void miscInstructions(cpu_t *z80, uint8_t opcode) {
     setUndocumentedFlags(z80, z80->B);
     break;
   case 0x41:
-    out(z80, z80->B, z80->BC);
+    out(z80, z80->BC, z80->B);
     break;
   case 0x42:
     sub(z80, z80->HL, z80->BC, &z80->HL, 'w', readFlag(z80, Z80_CF));
@@ -2227,7 +1480,7 @@ void miscInstructions(cpu_t *z80, uint8_t opcode) {
     setUndocumentedFlags(z80, z80->C);
     break;
   case 0x49:
-    out(z80, z80->C, z80->BC);
+    out(z80, z80->BC, z80->C);
     break;
   case 0x4A:
     ss2 = z80->HL;
@@ -2263,7 +1516,7 @@ void miscInstructions(cpu_t *z80, uint8_t opcode) {
     setUndocumentedFlags(z80, z80->D);
     break;
   case 0x51:
-    out(z80, z80->D, z80->BC);
+    out(z80, z80->BC, z80->D);
     break;
   case 0x52:
     sub(z80, z80->HL, z80->DE, &z80->HL, 'w', readFlag(z80, Z80_CF));
@@ -2304,7 +1557,7 @@ void miscInstructions(cpu_t *z80, uint8_t opcode) {
     setUndocumentedFlags(z80, z80->E);
     break;
   case 0x59:
-    out(z80, z80->E, z80->BC);
+    out(z80, z80->BC, z80->E);
     break;
   case 0x5A:
     ss2 = z80->HL;
@@ -2346,7 +1599,7 @@ void miscInstructions(cpu_t *z80, uint8_t opcode) {
     setUndocumentedFlags(z80, z80->H);
     break;
   case 0x61:
-    out(z80, z80->H, z80->BC);
+    out(z80, z80->BC, z80->H);
     break;
   case 0x62:
     sub(z80, z80->HL, z80->HL, &z80->HL, 'w', readFlag(z80, Z80_CF));
@@ -2391,14 +1644,14 @@ void miscInstructions(cpu_t *z80, uint8_t opcode) {
     setUndocumentedFlags(z80, z80->L);
     break;
   case 0x69:
-    out(z80, z80->L, z80->BC);
+    out(z80, z80->BC, z80->L);
     break;
   case 0x6A:
-    ss2 = z80->HL;
-    add(z80, z80->HL, z80->HL, &z80->HL, 'w', readFlag(z80, Z80_CF));
+    add(z80, z80->L, z80->L, &ss1, 'b', readFlag(z80, Z80_CF));
+    add(z80, z80->H, z80->H, &ss2, 'b', readFlag(z80, Z80_CF));
+    z80->HL = ss1 | ss2 << 8;
     checkSet(Z80_ZF, z80->HL == 0);
-    checkSet(Z80_SF, (z80->HL & 0x8000) != 0);
-    checkSet(Z80_PF, ((ss2 & 0xF0 ) >> 8) + ((ss2 & 0xF0 ) >> 8) < 255);
+    z80->PC -= 1;
     break;
   case 0x6B:
     LD(z80->HL, nnAsPointer(z80));
@@ -2436,7 +1689,7 @@ void miscInstructions(cpu_t *z80, uint8_t opcode) {
     setUndocumentedFlags(z80, ss1);
     break;
   case 0x71:
-    out(z80, 0, z80->BC);
+    out(z80, z80->BC, 0);
     break;
   case 0x72:
     ss2 = z80->HL;
@@ -2472,7 +1725,7 @@ void miscInstructions(cpu_t *z80, uint8_t opcode) {
     setUndocumentedFlags(z80, z80->A);
     break;
   case 0x79:
-    out(z80, z80->A, z80->BC);
+    out(z80, z80->BC, z80->A);
     break;
   case 0x7A:
     ss2 = z80->HL;
