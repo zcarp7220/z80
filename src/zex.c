@@ -2,8 +2,8 @@
 #include "z80.h"
 uint8_t zexRam[0x10000];
 void zexInit(uint8_t *buffer, size_t size) {
-  zexRam[0x0000] = 0xD3;
-  zexRam[0x0001] = 0x00;
+  zexRam[0x0000] = 0xED;
+  zexRam[0x0001] = 0x41;
   zexRam[0x0005] = 0xDB;
   zexRam[0x0006] = 0x00;
   zexRam[0x0007] = 0xC9;
@@ -41,7 +41,7 @@ void zexStep() {
   z80.writeByte = memWrite;
   z80.out = out;
   z80.in = in;
-  z80.PC = 0x99;
+  z80.PC = 0x100;
   z80.cycles = 1;
   for (;;) {
    // fprintf(stderr, "PC:%X A:%02X F:%02X  B:%02X C:%02X  D:%02X E:%02X  H:%02X L:%02X P:%02X\n",
@@ -49,7 +49,9 @@ void zexStep() {
    //         z80.B, z80.C,
    //         z80.D, z80.E,
    //         z80.H, z80.L, z80.SP);
-
+    if(z80.PC == 0){
+      exit(0);
+    }
     cpuStep(&z80);
   }
 }

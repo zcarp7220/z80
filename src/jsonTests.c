@@ -157,11 +157,11 @@ void jsonStep(struct json_array_element_s *myTests) {
         if (strcmp(finalRegisters[j].name, "F") != 0) {
           printf("Fail: Expected value for %s is 0x%X, Actual value for %s is 0x%X on test %s\n", finalObjects->name->string, atoi(json_value_as_number(finalObjects->value)->number), finalRegisters[j].name, actual, name->string);
         } else {
-          if ((actual & 0xD7) == (expected & 0xD7)) {
-            finalObjects = finalObjects->next;
-            j++;
-            continue;
-          }
+          //if ((actual & 0xD7) == (expected & 0xD7)) {
+          //  finalObjects = finalObjects->next;
+          //  j++;
+          //  continue;
+          //}
           printf("Fail: Expected value for %s is " BYTE_TO_BINARY_PATTERN ", Actual value for %s is " BYTE_TO_BINARY_PATTERN " Diffrence is " BYTE_TO_BINARY_PATTERN " on test %s\n", finalObjects->name->string, BYTE_TO_BINARY(atoi(json_value_as_number(finalObjects->value)->number)), finalRegisters[j].name, BYTE_TO_BINARY(actual), BYTE_TO_BINARY(actual ^ (atoi(json_value_as_number(finalObjects->value)->number))), name->string);
           printf("                                                                                    ^^^^^^^^\n");
           printf("                                                                                    SZ5H3PNC\n");

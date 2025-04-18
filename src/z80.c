@@ -164,14 +164,11 @@ static inline void sub(cpu_t *z80, int A, int B, void *storeLocation,
     checkSet(Z80_HF, !readFlag(z80, Z80_HF));
     checkSet(Z80_CF, A < B + carry);
   } else if (width == 'w') {
-    uint16_t result = A + ~(B) + carry;
-    add(z80, A, ~B, storeLocation, 'w', !carry);
-    setFlag(z80, Z80_NF);
-    checkSet(Z80_HF, !readFlag(z80, Z80_HF));
-    checkSet(Z80_CF, A < B + carry);
-    checkSet(Z80_PF, ((A ^ result) & (~B ^ result) & 0x8000) != 0);
-    checkSet(Z80_ZF, result == 0);
-    checkSet(Z80_SF, (result & 0x8000) != 0);
+    sub(z80, A & 0xFF, B & 0xFF, &ss1, 'b', carry);
+    sub(z80, (A & 0xFF00)>> 8, (B & 0xFF00) >> 8, &ss2, 'b', readFlag(z80, Z80_CF));
+    checkSet(Z80_ZF, *(uint16_t *)storeLocation == 0);
+    *(uint16_t *)storeLocation = ss1 | ss2 << 8;
+    z80->PC -= 1;
   }
 }
 
@@ -517,12 +514,34 @@ static inline void postINI_OUTI_R(cpu_t *z80, uint8_t data){
         checkSet(Z80_PF, readFlag(z80, Z80_PF) ^ getParity(z80->B & 7) ^ 1);
     }
 }
-void addHL(cpu_t *z80, int input){
-  add(z80, z80->L, input & 0xF, &ss1, 'b', readFlag(z80, Z80_CF));
-  add(z80, z80->H, (input & 0xF0) >> 8, &ss2,'b', readFlag(z80, Z80_CF));
+
+void cpd(cpu_t *z80){
+  oldZero = readFlag(z80, Z80_CF);
+  ss1 = readMem(z80, z80->HL--);
+  cp(z80, ss1);
+  z80->BC--;
+  checkSet(Z80_PF, z80->BC);
+  setFlag(z80, Z80_NF);
+  checkSet(Z80_F3, ss1 & Z80_F3);
+  checkSet(Z80_F5, ss1 & 0x2);
+  checkSet(Z80_CF, oldZero);
+}
+void cpi(cpu_t *z80){
+  cpd(z80);
+  z80->HL += 2;
+}
+void adcHL(cpu_t *z80, uint16_t input){
+  add(z80, z80->L, (input & 0xFF), &ss1, 'b', readFlag(z80, Z80_CF));
+  add(z80, z80->H, (input & 0xFF00) >> 8, &ss2, 'b', readFlag(z80, Z80_CF));
   z80->HL = ss1 | ss2 << 8;
+  checkSet(Z80_SF, z80->HL >> 15);
   checkSet(Z80_ZF, z80->HL == 0);
   z80->PC -= 1;
+}
+void sbcHL(cpu_t *z80, uint16_t input){
+  sub(z80, z80->HL, input, &z80->HL, 'w', readFlag(z80, Z80_CF));
+  checkSet(Z80_SF, z80->HL >> 15);
+  checkSet(Z80_ZF, z80->HL == 0);
 }
 void prefixInst(cpu_t *z80) {
   z80->PC += 1;
@@ -1415,14 +1434,10 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
 }
 void bitInstructions(cpu_t *z80, uint8_t opcode) {
   uint8_t memAtHL;
-  bool isHlIndex;
   uint16_t var = 0;
-  if(((opcode & 0xF) == 0x6) || ((opcode & 0xF )== 0xE)){
-    isHlIndex = true;
-    memAtHL = readMem(z80, z80->HL);
+  memAtHL = readMem(z80, z80->HL);
     var = z80->HL;
-   }
-   if(isHlIndex && isHL_IX_IY){
+   if(isHL_IX_IY){
     var = z80->HL + (int8_t)displacment;
     memAtHL = readMem(z80, var);
    }
@@ -1439,9 +1454,7 @@ void bitInstructions(cpu_t *z80, uint8_t opcode) {
   }else{
     bitFunctions[(opcode - 0x40) / 64] (z80,  ((opcode - 0x40) % 64) / 8, registers[opcode % 8]);
   }
-    if(isHlIndex){
     writeMem(z80, var, memAtHL);
-   }
 }
 void miscInstructions(cpu_t *z80, uint8_t opcode) {
   incR(z80);
@@ -1459,7 +1472,7 @@ void miscInstructions(cpu_t *z80, uint8_t opcode) {
     out(z80, z80->BC, z80->B);
     break;
   case 0x42:
-    sub(z80, z80->HL, z80->BC, &z80->HL, 'w', readFlag(z80, Z80_CF));
+  sbcHL(z80, z80->BC);
     break;
   case 0x43:
     ss1 = readNN(z80);
@@ -1494,11 +1507,7 @@ void miscInstructions(cpu_t *z80, uint8_t opcode) {
     out(z80, z80->BC, z80->C);
     break;
   case 0x4A:
-    ss2 = z80->HL;
-    add(z80, z80->HL, z80->BC, &z80->HL, 'w', readFlag(z80, Z80_CF));
-    checkSet(Z80_PF, ((ss2 ^ z80->HL) & (z80->BC ^ z80->HL) & 0x8000) != 0);
-    checkSet(Z80_ZF, z80->HL == 0);
-    checkSet(Z80_SF, (z80->HL & 0x8000) != 0);
+  adcHL(z80, z80->BC);
     break;
   case 0x4B:
     LD(z80->BC, nnAsPointer(z80));
@@ -1530,8 +1539,8 @@ void miscInstructions(cpu_t *z80, uint8_t opcode) {
     out(z80, z80->BC, z80->D);
     break;
   case 0x52:
-    sub(z80, z80->HL, z80->DE, &z80->HL, 'w', readFlag(z80, Z80_CF));
-    break;
+    sbcHL(z80, z80->DE);
+      break;
   case 0x53:
     ss1 = readNN(z80);
     writeMem(z80, ss1, z80->E);
@@ -1571,11 +1580,7 @@ void miscInstructions(cpu_t *z80, uint8_t opcode) {
     out(z80, z80->BC, z80->E);
     break;
   case 0x5A:
-    ss2 = z80->HL;
-    add(z80, z80->HL, z80->DE, &z80->HL, 'w', readFlag(z80, Z80_CF));
-    checkSet(Z80_PF, ((ss2 ^ z80->HL) & (z80->DE ^ z80->HL) & 0x8000) != 0);
-    checkSet(Z80_ZF, z80->HL == 0);
-    checkSet(Z80_SF, (z80->HL & 0x8000) != 0);
+  adcHL(z80, z80->DE);
     break;
   case 0x5B:
     LD(z80->DE, nnAsPointer(z80));
@@ -1613,9 +1618,7 @@ void miscInstructions(cpu_t *z80, uint8_t opcode) {
     out(z80, z80->BC, z80->H);
     break;
   case 0x62:
-    sub(z80, z80->HL, z80->HL, &z80->HL, 'w', readFlag(z80, Z80_CF));
-    checkSet(Z80_SF, (z80->HL & 0x8000) != 0);
-    checkSet(Z80_ZF, (uint16_t)z80->HL == 0);
+  sbcHL(z80, z80->HL);
     break;
   case 0x63:
     ss1 = readNN(z80);
@@ -1658,11 +1661,7 @@ void miscInstructions(cpu_t *z80, uint8_t opcode) {
     out(z80, z80->BC, z80->L);
     break;
   case 0x6A:
-    add(z80, z80->L, z80->L, &ss1, 'b', readFlag(z80, Z80_CF));
-    add(z80, z80->H, z80->H, &ss2, 'b', readFlag(z80, Z80_CF));
-    z80->HL = ss1 | ss2 << 8;
-    checkSet(Z80_ZF, z80->HL == 0);
-    z80->PC -= 1;
+    adcHL(z80, z80->HL);
     break;
   case 0x6B:
     LD(z80->HL, nnAsPointer(z80));
@@ -1703,11 +1702,7 @@ void miscInstructions(cpu_t *z80, uint8_t opcode) {
     out(z80, z80->BC, 0);
     break;
   case 0x72:
-    ss2 = z80->HL;
-    sub(z80, z80->HL, z80->SP, &z80->HL, 'w', readFlag(z80, Z80_CF));
-    checkSet(Z80_SF, (z80->HL & 0x8000) != 0);
-    checkSet(Z80_ZF, z80->HL == 0);
-    setUndocumentedFlags(z80, z80->HL << 8);
+  sbcHL(z80, z80->SP);
     break;
   case 0x73:
     write16(z80, readNN(z80), z80->SP);
@@ -1739,11 +1734,7 @@ void miscInstructions(cpu_t *z80, uint8_t opcode) {
     out(z80, z80->BC, z80->A);
     break;
   case 0x7A:
-    ss2 = z80->HL;
-    add(z80, z80->HL, z80->SP, &z80->HL, 'w', readFlag(z80, Z80_CF));
-    checkSet(Z80_PF, ((ss2 ^ z80->HL) & (z80->SP ^ z80->HL) & 0x8000) != 0);
-    checkSet(Z80_ZF, z80->HL == 0);
-    checkSet(Z80_SF, (z80->HL & 0x8000) != 0);
+  adcHL(z80, z80->SP);
     break;
   case 0x7B:
     LD(z80->SP, nnAsPointer(z80));
@@ -1767,7 +1758,7 @@ void miscInstructions(cpu_t *z80, uint8_t opcode) {
     clearFlag(z80, Z80_NF | Z80_HF);
     writeMem(z80, z80->DE++, ss1);
     ss1 += z80->A;
-    checkSet(Z80_PF, z80->BC--);
+    checkSet(Z80_PF, --z80->BC);
     checkSet(Z80_F3, ss1 & Z80_F3);
     checkSet(Z80_F5, ss1 & 0x2);
     z80->PC += 1;
@@ -1777,89 +1768,56 @@ void miscInstructions(cpu_t *z80, uint8_t opcode) {
     clearFlag(z80, Z80_NF | Z80_HF);
     writeMem(z80, z80->DE++, ss1);
     ss1 += z80->A;
-    checkSet(Z80_PF, z80->BC--);
+    checkSet(Z80_PF, --z80->BC);
     checkSet(Z80_F3, ss1 & Z80_F3);
     checkSet(Z80_F5, ss1 & 0x2);
     if (z80->BC != 0) {
       z80->PC -= 2;
+      setUndocumentedFlags(z80, (z80->PC) >> 8);
     }
     z80->PC += 1;
     break;
   case 0xA1:
-    oldZero = readFlag(z80, Z80_CF);
-    ss1 = readMem(z80, z80->HL++);
-    clearFlag(z80, Z80_NF);
-    cp(z80, ss1);
-    ss1 -= z80->A - readFlag(z80, Z80_HF);
-    checkSet(Z80_PF, z80->BC--);
-    checkSet(Z80_F3, ss1 & Z80_F3);
-    checkSet(Z80_F5, ss1 & 0x2);
-    checkSet(Z80_CF, oldZero);
+    cpi(z80);
     break;
   case 0xB1:
-    oldZero = readFlag(z80, Z80_CF);
-    ss1 = readMem(z80, z80->HL++);
-    clearFlag(z80, Z80_NF);
-    cp(z80, ss1);
-    ss1 += z80->A;
-    checkSet(Z80_PF, z80->BC--);
-    checkSet(Z80_F3, ss1 & Z80_F3);
-    checkSet(Z80_F5, ss1 & 0x2);
-    checkSet(Z80_CF, oldZero);
+   cpi(z80);
     if (z80->BC != 0 && !readFlag(z80, Z80_ZF)) {
       z80->PC -= 2;
     }
     break;
   case 0xA8:
-    ss1 = readMem(z80, z80->HL);
-    z80->HL--;
-    clearFlag(z80, Z80_NF | Z80_HF);
-    writeMem(z80, z80->DE, ss1);
-    z80->DE--;
-    ss1 += z80->A;
-    checkSet(Z80_PF, z80->BC--);
-    checkSet(Z80_F3, ss1 & Z80_F3);
-    checkSet(Z80_F5, ss1 & 0x2);
-    z80->PC += 1;
+  ss1 = readMem(z80, z80->HL--);
+  clearFlag(z80, Z80_NF | Z80_HF);
+  writeMem(z80, z80->DE--, ss1);
+  ss1 += z80->A;
+  checkSet(Z80_PF, --z80->BC);
+  checkSet(Z80_F3, ss1 & Z80_F3);
+  checkSet(Z80_F5, ss1 & 0x2);
+  z80->PC += 1;
     break;
   case 0xB8:
-    ss1 = readMem(z80, z80->HL--);
-    clearFlag(z80, Z80_NF | Z80_HF);
-    writeMem(z80, z80->DE--, ss1);
-    ss1 += z80->A;
-    z80->BC--;
-    checkSet(Z80_PF, z80->BC);
-    checkSet(Z80_F3, ss1 & Z80_F3);
-    checkSet(Z80_F5, ss1 & 0x2);
-    if (z80->BC != 0) {
-      z80->PC -= 2;
-    }
-    z80->PC += 1;
+  ss1 = readMem(z80, z80->HL--);
+  clearFlag(z80, Z80_NF | Z80_HF);
+  writeMem(z80, z80->DE--, ss1);
+  ss1 += z80->A;
+  checkSet(Z80_PF, --z80->BC);
+  checkSet(Z80_F3, ss1 & Z80_F3);
+  checkSet(Z80_F5, ss1 & 0x2);
+  if (z80->BC != 0) {
+    z80->PC -= 2;
+    setUndocumentedFlags(z80, (z80->PC) >> 8);
+  }
+  z80->PC += 1;
     break;
   case 0xA9:
-    oldZero = readFlag(z80, Z80_CF);
-    ss1 = readMem(z80, z80->HL--);
-    cp(z80, ss1);
-    setFlag(z80, Z80_NF);
-    z80->BC--;
-    checkSet(Z80_PF, z80->BC);
-    checkSet(Z80_F3, ss1 & Z80_F3);
-    checkSet(Z80_F5, ss1 & 0x2);
-    checkSet(Z80_CF, oldZero);
-    break;
+  cpd(z80);
+      break;
   case 0xB9:
-    oldZero = readFlag(z80, Z80_CF);
-    ss1 = readMem(z80, z80->HL--);
-    cp(z80, ss1);
-    z80->BC--;
-    checkSet(Z80_PF, z80->BC);
-    setFlag(z80, Z80_NF);
-    checkSet(Z80_F3, ss1 & Z80_F3);
-    checkSet(Z80_F5, ss1 & 0x2);
-    checkSet(Z80_CF, oldZero);
-    if (z80->BC != 0 && !readFlag(z80, Z80_ZF)) {
-      z80->PC -= 2;
-    }
+    cpd(z80);
+  if (z80->BC != 0 && !readFlag(z80, Z80_ZF)) {
+    z80->PC -= 2;
+  }
     break;
   case 0xA2:
     // INI

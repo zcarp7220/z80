@@ -19,8 +19,7 @@
       ((byte)&0x02 ? '1' : '0'), \
       ((byte)&0x01 ? '1' : '0')
 typedef struct cpu {
-  bool halt;
-//Registers
+  //Registers
 union{struct{uint8_t F; uint8_t A;};uint16_t AF; };
 union{struct{uint8_t C; uint8_t B;};uint16_t BC; };
 union{struct{uint8_t E; uint8_t D;};uint16_t DE; };
@@ -44,8 +43,9 @@ union{struct{uint8_t Lp; uint8_t Hp;};uint16_t HLp; };
   bool IFF2;
   bool wasLastInstEI;
   bool MI;
-  bool NMI;
-  long long cycles;
+  bool NMI; 
+  bool halt;
+  long cycles;
   //Functions
   uint8_t (*readByte)(void* ,uint16_t);
   void (*writeByte)(void* ,uint16_t, uint8_t);
