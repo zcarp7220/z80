@@ -2,19 +2,22 @@
 #define LD(B, A) \
   (B = A);       \
   z80->PC += 1;
-#define HLASINDEX(A)                     \
-  ss2 = z80->HL;                         \
-  if (isHL_IX_IY) {                      \
-    ss1 = z80->HL + (int8_t)displacment; \
-    z80->PC += 1;                        \
-  } else {                               \
-    ss1 = z80->HL;                       \
-  }                                      \
-  z80->HL = readMem(z80, ss1);           \
-  A;                                     \
-  writeMem(z80, ss1, z80->HL);           \
-  z80->HL = ss2;
-int ss1, ss2, tempStorage, displacment = 0;
+
+#define HLASINDEX(A)                                      \
+  do {                                                    \
+    uint16_t _hl_backup = z80->HL;                        \
+    uint16_t _addr = isHL_IX_IY                           \
+                         ? z80->HL + (int8_t)displacement \
+                         : z80->HL;                       \
+    if (isHL_IX_IY) z80->PC += 1;                         \
+                                                          \
+    z80->HL = readMem(z80, _addr);                        \
+    A;                                                    \
+    writeMem(z80, _addr, z80->HL);                        \
+    z80->HL = _hl_backup;                                 \
+  } while (0)
+
+int ss1, ss2, tempStorage, displacement = 0;
 uint16_t hlStorage = 0;
 bool oldParity, oldSign, oldZero, isHL_IX_IY = false;
 static inline uint8_t readMem(cpu_t *const z, uint16_t addr) {
@@ -372,8 +375,8 @@ void dnjz(cpu_t *z80) {
   z80->PC += 1;
 }
 // Algorithm adapted from:
-// https://worldofspectrum.org/faq/reference/z80reference.htm#DAA
-void daa(cpu_t *z80) {
+// https://worldofspectrum.org/faq/reference/z80reference.htm#DATA
+void DAA_inst(cpu_t *z80) {
   int afterA = z80->A;
   int correctFactor = 0;
   if (z80->A > 0x99 || readFlag(z80, Z80_CF)) {
@@ -541,11 +544,11 @@ void sbcHL(cpu_t *z80, uint16_t input) {
 }
 void prefixInst(cpu_t *z80) {
   z80->PC += 1;
-  displacment = readMem(z80, z80->PC + 1);
+  displacement = readMem(z80, z80->PC + 1);
   if (readMem(z80, z80->PC) != 0xCB) {
     runOpcode(z80, readMem(z80, z80->PC));
   } else if (readMem(z80, z80->PC) == 0xCB) {
-    ss1 = z80->HL + (int8_t)displacment;
+    ss1 = z80->HL + (int8_t)displacement;
     if (readMem(z80, z80->PC + 2) >= 0x40 &&
         readMem(z80, z80->PC + 2) <= 0x7F) {
       uint8_t temp = readMem(z80, ss1);
@@ -712,7 +715,7 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
     LD(z80->H, readN(z80));
     break;
   case 0x27:
-    daa(z80);
+    DAA_inst(z80);
     break;
   case 0x28:
     jr(z80, readFlag(z80, Z80_ZF));
@@ -1424,8 +1427,6 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
   case 0xFF:
     rst(z80, 0x38);
     break;
-  default:
-    printf("Unhandeld Opcode, 0x%X", z80->PC);
   }
 }
 void bitInstructions(cpu_t *z80, uint8_t opcode) {
@@ -1434,13 +1435,13 @@ void bitInstructions(cpu_t *z80, uint8_t opcode) {
   memAtHL = readMem(z80, z80->HL);
   var = z80->HL;
   if (isHL_IX_IY) {
-    var = z80->HL + (int8_t)displacment;
+    var = z80->HL + (int8_t)displacement;
     memAtHL = readMem(z80, var);
   }
   incR(z80);
   uint8_t *registers[8] = {&z80->B, &z80->C, &z80->D, &z80->E, &z80->H, &z80->L, &memAtHL, &z80->A};
-  void (*shiftFunctions[4])(cpu_t * z80, char direction, void *val) = {rotateC, rotate, shift, logicalShift};
-  void (*bitFunctions[3])(cpu_t * z80, int pos, uint8_t *ss2) = {bit, reset, set};
+  void (*shiftFunctions[4])(cpu_t *z80, char direction, void *val) = {rotateC, rotate, shift, logicalShift};
+  void (*bitFunctions[3])(cpu_t *z80, int pos, uint8_t *ss2) = {bit, reset, set};
   if (opcode < 0x40) {
     if ((opcode & 0xF) > 0x7) {
       shiftFunctions[opcode / 16](z80, 'r', registers[opcode % 8]);
@@ -1904,10 +1905,6 @@ void miscInstructions(cpu_t *z80, uint8_t opcode) {
       z80->PC -= 2;
     }
     postINI_OUTI_R(z80, ss2);
-    break;
-  default:
-    printf("UNKONWN: DO 0x%X\n", opcode);
-    z80->PC += 1;
     break;
   }
 }

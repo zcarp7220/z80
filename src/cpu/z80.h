@@ -1,4 +1,6 @@
-#include "common.h"
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
 #define Z80_SF 128 /*  Bitmask of the Z80 S flag.   */
 #define Z80_ZF 64  /*  Bitmask of the Z80 Z flag.   */
 #define Z80_F5 32  /*  Bitmask of the Z80 F5 flag.  */
