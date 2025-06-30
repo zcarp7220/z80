@@ -9,4 +9,5 @@ src/z80.c
 src/zex.c
 )
 
-target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic -O2 -ggdb -g -gdwarf-3 -ldl -pg)
+#target_link_options(${PROJECT_NAME} PRIVATE -pg)
+target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic -O2 -lto=auto -ldl)
