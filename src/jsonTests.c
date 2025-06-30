@@ -5,7 +5,7 @@ struct json_object_s *initalValue = NULL;
 struct json_object_s *expectedFinalValue = NULL;
 struct json_string_s *name = NULL;
 int address = 0;
-int datas = 0;
+int data = 0;
 cpu_t z80 = {0};
 bool success = true;
 uint8_t ram[0xFFFF];
@@ -23,14 +23,14 @@ uint8_t input(void *unused, uint16_t addr) {
   if (atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->value)->number) == addr) {
     return atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->next->value)->number);
   }
-  printf("Failed, The expected addres is 0x%X but got 0x%X instead \n", addr, atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->value)->number));
+  printf("Failed, The expected address is 0x%X but got 0x%X instead \n", addr, atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->value)->number));
   return 0xEA;
 }
 void output(void *unused, uint16_t addr, uint8_t data) {
-  if (atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->value)->number) != addr){
+  if (atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->value)->number) != addr) {
     printf("Addr(0x%X) doesnt line up with expected(0x%X) value\n", addr, atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->value)->number));
   }
-  if(atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->next->value)->number) != data){
+  if (atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->next->value)->number) != data) {
     printf("Data(0x%X) doesnt line up with expected(0x%X) value \n", data, atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->next->value)->number));
   }
   exit(0);
@@ -157,12 +157,12 @@ void jsonStep(struct json_array_element_s *myTests) {
         if (strcmp(finalRegisters[j].name, "F") != 0) {
           printf("Fail: Expected value for %s is 0x%X, Actual value for %s is 0x%X on test %s\n", finalObjects->name->string, atoi(json_value_as_number(finalObjects->value)->number), finalRegisters[j].name, actual, name->string);
         } else {
-          //if ((actual & 0xD7) == (expected & 0xD7)) {
-          //  finalObjects = finalObjects->next;
-          //  j++;
-          //  continue;
-          //}
-          printf("Fail: Expected value for %s is " BYTE_TO_BINARY_PATTERN ", Actual value for %s is " BYTE_TO_BINARY_PATTERN " Diffrence is " BYTE_TO_BINARY_PATTERN " on test %s\n", finalObjects->name->string, BYTE_TO_BINARY(atoi(json_value_as_number(finalObjects->value)->number)), finalRegisters[j].name, BYTE_TO_BINARY(actual), BYTE_TO_BINARY(actual ^ (atoi(json_value_as_number(finalObjects->value)->number))), name->string);
+          if ((actual & 0xD7) == (expected & 0xD7)) {
+            finalObjects = finalObjects->next;
+            j++;
+            continue;
+          }
+          printf("Fail: Expected value for %s is " BYTE_TO_BINARY_PATTERN ", Actual value for %s is " BYTE_TO_BINARY_PATTERN " Difference is " BYTE_TO_BINARY_PATTERN " on test %s\n", finalObjects->name->string, BYTE_TO_BINARY(atoi(json_value_as_number(finalObjects->value)->number)), finalRegisters[j].name, BYTE_TO_BINARY(actual), BYTE_TO_BINARY(actual ^ (atoi(json_value_as_number(finalObjects->value)->number))), name->string);
           printf("                                                                                    ^^^^^^^^\n");
           printf("                                                                                    SZ5H3PNC\n");
         }
