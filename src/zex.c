@@ -1,5 +1,5 @@
 #include "common.h"
-#include "z80.h"
+#include "cpu/z80.h"
 uint8_t zexRam[0x10000];
 void zexInit(uint8_t *buffer, size_t size) {
   zexRam[0x0000] = 0xED;
