@@ -1,5 +1,5 @@
+#include "../z80.h"
 #include "common.h"
-#include "cpu/z80.h"
 struct json_object_element_s *currentTest = NULL;
 struct json_object_s *initalValue = NULL;
 struct json_object_s *expectedFinalValue = NULL;

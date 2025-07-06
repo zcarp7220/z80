@@ -1,5 +1,5 @@
+#include "../z80.h"
 #include "common.h"
-#include "cpu/z80.h"
 uint8_t zexRam[0x10000];
 void zexInit(uint8_t *buffer, size_t size) {
   zexRam[0x0000] = 0xED;
@@ -18,14 +18,15 @@ void memWrite(void *unused, uint16_t addr, uint8_t data) {
 uint8_t memRead(void *unused, uint16_t addr) {
   return zexRam[addr];
 }
-void out(cpu_t *z80, uint16_t addr, uint8_t data) {
+void out(void *z80, uint16_t addr, uint8_t data) {
   exit(0);
 }
-uint8_t in(cpu_t *z80, uint16_t addr) {
-  if (z80->C == 2) {
-    printf("%c", z80->E);
-  } else if (z80->C == 9) {
-    int i = z80->DE;
+uint8_t in(void *z, uint16_t addr) {
+  cpu_t z80 = *(cpu_t *)z;
+  if (z80.C == 2) {
+    printf("%c", z80.E);
+  } else if (z80.C == 9) {
+    int i = z80.DE;
     while (memRead(NULL, i) != 0x24) {
       printf("%c", memRead(NULL, i));
       i++;
