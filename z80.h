@@ -10,16 +10,6 @@
 #define Z80_NF 2   /*  Bitmask of the Z80 N flag.   */
 #define Z80_CF 1   /*  Bitmask of the Z80 C flag.   */
 
-#define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
-#define BYTE_TO_BINARY(byte)       \
-  ((byte) & 0x80 ? '1' : '0'),     \
-      ((byte) & 0x40 ? '1' : '0'), \
-      ((byte) & 0x20 ? '1' : '0'), \
-      ((byte) & 0x10 ? '1' : '0'), \
-      ((byte) & 0x08 ? '1' : '0'), \
-      ((byte) & 0x04 ? '1' : '0'), \
-      ((byte) & 0x02 ? '1' : '0'), \
-      ((byte) & 0x01 ? '1' : '0')
 typedef struct cpu {
   // Registers
   union {
@@ -96,15 +86,21 @@ typedef struct cpu {
   bool NMI;
   bool halt;
   long cycles;
+  long numInst;
+  void *userdata;
   // Functions
-  uint8_t (*readByte)(void *, uint16_t);
-  void (*writeByte)(void *, uint16_t, uint8_t);
-  uint8_t (*in)(void *, uint16_t);
-  void (*out)(void *, uint16_t, uint8_t);
+  uint8_t (*readByte)(struct cpu *, uint16_t);
+  void (*writeByte)(struct cpu *, uint16_t, uint8_t);
+  uint8_t (*in)(struct cpu *, uint16_t);
+  void (*out)(struct cpu *, uint16_t, uint8_t);
 } cpu_t;
 void runOpcode(cpu_t *z80, uint8_t opcode);
 void handleInterupts(cpu_t *z80);
-void cpuStep(cpu_t *z80);
 void bitInstructions(cpu_t *z80, uint8_t opcode);
 void miscInstructions(cpu_t *z80, uint8_t opcode);
+void prefixInst(cpu_t *z80, uint8_t opcode);
+// User Called Functions
 void z80Init(cpu_t *z80);
+void cpuStep(cpu_t *z80);
+void request_NMI(cpu_t *z80);
+void request_INT(cpu_t *z80);

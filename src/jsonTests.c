@@ -1,5 +1,18 @@
 #include "../z80.h"
 #include "common.h"
+
+
+#define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
+#define BYTE_TO_BINARY(byte)       \
+  ((byte) & 0x80 ? '1' : '0'),     \
+      ((byte) & 0x40 ? '1' : '0'), \
+      ((byte) & 0x20 ? '1' : '0'), \
+      ((byte) & 0x10 ? '1' : '0'), \
+      ((byte) & 0x08 ? '1' : '0'), \
+      ((byte) & 0x04 ? '1' : '0'), \
+      ((byte) & 0x02 ? '1' : '0'), \
+      ((byte) & 0x01 ? '1' : '0')
+
 struct json_object_element_s *currentTest = NULL;
 struct json_object_s *initalValue = NULL;
 struct json_object_s *expectedFinalValue = NULL;
@@ -11,22 +24,22 @@ bool success = true;
 uint8_t ram[0xFFFF];
 struct json_array_s *expectedPorts = NULL;
 
-void writeMem(void *unused, uint16_t addr, uint8_t data) {
+void writeMem(cpu_t *unused, uint16_t addr, uint8_t data) {
   ram[addr] = data;
 }
 
-uint8_t readMem(void *unused, uint16_t addr) {
+uint8_t readMem(cpu_t *unused, uint16_t addr) {
   return ram[addr];
 }
 
-uint8_t input(void *unused, uint16_t addr) {
+uint8_t input(cpu_t *unused, uint16_t addr) {
   if (atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->value)->number) == addr) {
     return atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->next->value)->number);
   }
   printf("Failed, The expected address is 0x%X but got 0x%X instead \n", addr, atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->value)->number));
   return 0xEA;
 }
-void output(void *unused, uint16_t addr, uint8_t data) {
+void output(cpu_t *unused, uint16_t addr, uint8_t data) {
   if (atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->value)->number) != addr) {
     printf("Addr(0x%X) doesnt line up with expected(0x%X) value\n", addr, atoi(json_value_as_number(json_value_as_array(expectedPorts->start->value)->start->value)->number));
   }
@@ -50,6 +63,7 @@ void set_value(void *var, const char *value, char type) {
   }
 }
 void jsonStep(struct json_array_element_s *myTests) {
+  z80Init(&z80);
   z80.readByte = readMem;
   z80.writeByte = writeMem;
   z80.in = input;
@@ -57,6 +71,7 @@ void jsonStep(struct json_array_element_s *myTests) {
   struct json_object_element_s *currentTest = json_value_as_object(myTests->value)->start->next;
   struct json_object_s *initalValue = json_value_as_object(currentTest->value);
   struct json_object_s *expectedFinalValue = json_value_as_object(currentTest->next->value);
+  struct json_array_s *cycles = json_value_as_array(currentTest->next->next->value);
   struct json_string_s *name = json_value_as_string(json_value_as_object(myTests->value)->start->value);
   if (currentTest->next->next->next != NULL) {
     expectedPorts = json_value_as_array(currentTest->next->next->next->value);
@@ -116,7 +131,6 @@ void jsonStep(struct json_array_element_s *myTests) {
 
   // STEP
   cpuStep(&z80);
-
   struct json_object_element_s *finalObjects = expectedFinalValue->start;
   int actual = 0;
   struct objects finalRegisters[] = {
@@ -188,6 +202,12 @@ void jsonStep(struct json_array_element_s *myTests) {
       success = false;
     }
     ramCheckIndex++;
+  }
+
+  long cyclesLength = cycles->length;
+  if(cyclesLength != z80.cycles){
+    printf("Cycle Mismatch, Expected %ld cycles, instead got %ld cycles on test %s| Diff: %ld\n", cyclesLength, z80.cycles, name->string, (cyclesLength - z80.cycles));
+    success = false;
   }
   if (!success) {
     exit(0);
