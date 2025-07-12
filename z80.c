@@ -59,7 +59,7 @@ static inline uint8_t in(cpu_t *const z, uint16_t addr) {
   return z->in(z, addr);
 }
 
-static inline void out(cpu_t *const z, uint16_t addr, uint8_t data) {
+static inline void out(cpu_t *const z, uint8_t addr, uint8_t data) {
   z->PC += 1;
   z->out(z, addr, data);
 }

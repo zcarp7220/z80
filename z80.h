@@ -92,7 +92,7 @@ typedef struct cpu {
   uint8_t (*readByte)(struct cpu *, uint16_t);
   void (*writeByte)(struct cpu *, uint16_t, uint8_t);
   uint8_t (*in)(struct cpu *, uint16_t);
-  void (*out)(struct cpu *, uint16_t, uint8_t);
+  void (*out)(struct cpu *, uint8_t, uint8_t);
 } cpu_t;
 void runOpcode(cpu_t *z80, uint8_t opcode);
 void handleInterupts(cpu_t *z80);
