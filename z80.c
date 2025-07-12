@@ -121,25 +121,25 @@ void request_INT(cpu_t *z80, uint16_t intData) {
   z80->intData = intData;
 }
 void cpuStep(cpu_t *z80) {
-  handleInterupts(z80);
   if (!z80->halt) {
     runOpcode(z80, readMem(z80, z80->PC));
   } else {
     runOpcode(z80, 0);
     z80->PC -= 1;
+    z80->numInst -= 1;
   }
   z80->numInst += 1;
+  handleInterupts(z80);
 }
-
+#include <stdio.h>
 void handleInterupts(cpu_t *z80) {
-  if (z80->eiDelay == true) {
-    z80->eiDelay -= 1;
-    if (z80->eiDelay == false) {
-      z80->IFF1 = 1;
-      z80->IFF2 = 1;
-    }
+  if (z80->eiDelay) {
+    z80->eiDelay = false;
+    z80->IFF1 = 1;
+    z80->IFF2 = 1;
     return;
   }
+
   if (z80->NMI) {
     z80->IFF2 = z80->IFF1;
     z80->IFF1 = false;
@@ -163,7 +163,8 @@ void handleInterupts(cpu_t *z80) {
       break;
     case 2:
       z80->cycles += 19;
-      call(z80, (z80->I << 8) | z80->intData);
+      call(z80, readMem(z80, ((z80->I << 8) | z80->intData) + 1) << 8 |
+                    readMem(z80, ((z80->I << 8) | z80->intData)));
       break;
     default:
       exit(100);
