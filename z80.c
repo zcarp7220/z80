@@ -1,108 +1,173 @@
 #include "z80.h"
-#define LD(B, A) \
-  (B = A);       \
+#define LD(B, A)                                                                                   \
+  (B = A);                                                                                         \
   z80->PC += 1;
 
-#define HLASINDEX(A)                                      \
-  do {                                                    \
-    uint16_t _hl_backup = z80->HL;                        \
-    uint16_t _addr = isHL_IX_IY                           \
-                         ? z80->HL + (int8_t)displacement \
-                         : z80->HL;                       \
-    if (isHL_IX_IY) z80->PC += 1;                         \
-                                                          \
-    z80->HL = readMem(z80, _addr);                        \
-    A;                                                    \
-    writeMem(z80, _addr, z80->HL);                        \
-    z80->HL = _hl_backup;                                 \
+#define HLASINDEX(A)                                                                               \
+  do {                                                                                             \
+    uint16_t _hl_backup = z80->HL;                                                                 \
+    uint16_t _addr = isHL_IX_IY ? z80->HL + (int8_t)displacement : z80->HL;                        \
+    if (isHL_IX_IY) z80->PC += 1;                                                                  \
+                                                                                                   \
+    z80->HL = readMem(z80, _addr);                                                                 \
+    A;                                                                                             \
+    writeMem(z80, _addr, z80->HL);                                                                 \
+    z80->HL = _hl_backup;                                                                          \
   } while (0)
 
-static const uint8_t cyc_00[256] = {4, 10, 7, 6, 4, 4, 7, 4, 4, 11, 7, 6, 4, 4,
-    7, 4, 8, 10, 7, 6, 4, 4, 7, 4, 12, 11, 7, 6, 4, 4, 7, 4, 7, 10, 16, 6, 4, 4,
-    7, 4, 7, 11, 16, 6, 4, 4, 7, 4, 7, 10, 13, 6, 11, 11, 10, 4, 7, 11, 13, 6,
-    4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4,
-    4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4,
-    7, 4, 7, 7, 7, 7, 7, 7, 4, 7, 4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7,
-    4, 4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4,
-    4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4, 4,
-    4, 4, 4, 4, 4, 7, 4, 5, 10, 10, 10, 10, 11, 7, 11, 5, 10, 10, 0, 10, 17, 7,
-    11, 5, 10, 10, 11, 10, 11, 7, 11, 5, 4, 10, 11, 10, 0, 7, 11, 5, 10, 10, 19,
-    10, 11, 7, 11, 5, 4, 10, 4, 10, 0, 7, 11, 5, 10, 10, 4, 10, 11, 7, 11, 5, 6,
-    10, 4, 10, 0, 7, 11};
+static const uint8_t cyc_00[256] = {4, 10, 7, 6, 4, 4, 7, 4, 4, 11, 7, 6, 4, 4, 7, 4, 8, 10, 7, 6,
+    4, 4, 7, 4, 12, 11, 7, 6, 4, 4, 7, 4, 7, 10, 16, 6, 4, 4, 7, 4, 7, 11, 16, 6, 4, 4, 7, 4, 7, 10,
+    13, 6, 11, 11, 10, 4, 7, 11, 13, 6, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4,
+    4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4,
+    7, 7, 7, 7, 7, 7, 4, 7, 4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4,
+    4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4,
+    4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4, 5, 10, 10, 10, 10, 11, 7, 11, 5, 10, 10, 0, 10,
+    17, 7, 11, 5, 10, 10, 11, 10, 11, 7, 11, 5, 4, 10, 11, 10, 0, 7, 11, 5, 10, 10, 19, 10, 11, 7,
+    11, 5, 4, 10, 4, 10, 0, 7, 11, 5, 10, 10, 4, 10, 11, 7, 11, 5, 6, 10, 4, 10, 0, 7, 11};
 
-static const uint8_t cyc_ed[256] = {8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 12,
-    12, 15, 20, 8, 14, 8, 9, 12, 12, 15, 20, 8, 8, 8, 9, 12, 12, 15, 20, 8, 14,
-    8, 9, 12, 12, 15, 20, 8, 8, 8, 9, 12, 12, 15, 20, 8, 14, 8, 18, 12, 12, 15,
-    20, 8, 8, 8, 18, 12, 12, 15, 20, 8, 14, 8, 8, 12, 12, 15, 20, 8, 14, 8, 8,
-    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-    8, 8, 8, 8, 8, 8, 8, 16, 16, 16, 16, 8, 8, 8, 8, 16, 16, 16, 16, 8, 8, 8, 8,
-    16, 16, 16, 16, 8, 8, 8, 8, 16, 16, 16, 16, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-    8, 8, 8, 8, 8, 8, 8};
+static const uint8_t cyc_ed[256] = {8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
+    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
+    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 12, 12, 15, 20, 8, 14, 8, 9, 12, 12, 15, 20, 8, 8, 8, 9, 12,
+    12, 15, 20, 8, 14, 8, 9, 12, 12, 15, 20, 8, 8, 8, 9, 12, 12, 15, 20, 8, 14, 8, 18, 12, 12, 15,
+    20, 8, 8, 8, 18, 12, 12, 15, 20, 8, 14, 8, 8, 12, 12, 15, 20, 8, 14, 8, 8, 8, 8, 8, 8, 8, 8, 8,
+    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 16, 16, 16, 16, 8, 8,
+    8, 8, 16, 16, 16, 16, 8, 8, 8, 8, 16, 16, 16, 16, 8, 8, 8, 8, 16, 16, 16, 16, 8, 8, 8, 8, 8, 8,
+    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
+    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8};
 
-static const uint8_t cyc_ddfd[256] = {
-    4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-    4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-    4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-    4, 4, 4, 4, 12, 12, 9, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-    4, 4, 4, 4, 4, 4, 12, 4, 4, 4, 4, 4, 4, 4, 12, 4,
-    4, 4, 4, 4, 4, 4, 12, 4, 4, 4, 4, 4, 4, 4, 12, 4,
-    4, 4, 4, 4, 4, 4, 12, 4, 4, 4, 4, 4, 4, 4, 12, 4,
-    12, 12, 12, 12, 12, 12, 4, 12, 4, 4, 4, 4, 4, 4, 12, 4,
-    4, 4, 4, 4, 4, 4, 12, 4, 4, 4, 4, 4, 4, 4, 12, 4,
-    4, 4, 4, 4, 4, 4, 12, 4, 4, 4, 4, 4, 4, 4, 12, 4,
-    4, 4, 4, 4, 4, 4, 12, 4, 4, 4, 4, 4, 4, 4, 12, 4,
-    4, 4, 4, 4, 4, 4, 12, 4, 4, 4, 4, 4, 4, 4, 12, 4,
-    4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 0, 4, 4, 4, 4,
-    4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-    4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-    4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
+static const uint8_t cyc_ddfd[256] = {4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+    4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 12,
+    12, 9, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 12, 4, 4, 4, 4, 4, 4, 4, 12, 4, 4, 4, 4, 4,
+    4, 4, 12, 4, 4, 4, 4, 4, 4, 4, 12, 4, 4, 4, 4, 4, 4, 4, 12, 4, 4, 4, 4, 4, 4, 4, 12, 4, 12, 12,
+    12, 12, 12, 12, 4, 12, 4, 4, 4, 4, 4, 4, 12, 4, 4, 4, 4, 4, 4, 4, 12, 4, 4, 4, 4, 4, 4, 4, 12,
+    4, 4, 4, 4, 4, 4, 4, 12, 4, 4, 4, 4, 4, 4, 4, 12, 4, 4, 4, 4, 4, 4, 4, 12, 4, 4, 4, 4, 4, 4, 4,
+    12, 4, 4, 4, 4, 4, 4, 4, 12, 4, 4, 4, 4, 4, 4, 4, 12, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 0, 4,
+    4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+    4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
 
 int ss1, ss2, tempStorage, displacement = 0;
 uint16_t hlStorage = 0;
 bool oldParity, oldSign, oldZero, isHL_IX_IY = false;
-static inline uint8_t
-readMem(cpu_t *const z, uint16_t addr) {
-  return z->readByte(z, addr);
-}
+static inline uint8_t readMem(cpu_t *const z, uint16_t addr) { return z->readByte(z, addr); }
 
-static inline void
-writeMem(cpu_t *const z, uint16_t addr, uint8_t data) {
+static inline void writeMem(cpu_t *const z, uint16_t addr, uint8_t data) {
   z->writeByte(z, addr, data);
 }
 
-static inline uint8_t
-in(cpu_t *const z, uint16_t addr) {
+static inline uint8_t in(cpu_t *const z, uint16_t addr) {
   z->PC += 1;
   return z->in(z, addr);
 }
 
-static inline void
-out(cpu_t *const z, uint16_t addr, uint8_t data) {
+static inline void out(cpu_t *const z, uint16_t addr, uint8_t data) {
   z->PC += 1;
   z->out(z, addr, data);
 }
 
+void setFlag(cpu_t *z80, int flag) { z80->F |= flag; }
+
+void clearFlag(cpu_t *z80, int flag) { z80->F &= ~(flag); }
+
+bool readFlag(cpu_t *z80, int flag) { return z80->F & flag; }
+
+uint8_t pop(cpu_t *z80) {
+  z80->SP += 1;
+  return readMem(z80, z80->SP - 1);
+}
+
+void push(cpu_t *z80, uint8_t A) {
+  z80->SP -= 1;
+  writeMem(z80, z80->SP, A);
+}
+
+void push16(cpu_t *z80, uint16_t A) {
+  push(z80, A >> 8);
+  push(z80, A & 0xFF);
+}
+
+uint16_t pop16(cpu_t *z80) { return pop(z80) | pop(z80) << 8; }
+
+static inline uint16_t readNextWord(cpu_t *z80) {
+  z80->PC += 2;
+  return readMem(z80, z80->PC - 1) | readMem(z80, z80->PC) << 8;
+}
+
+static inline uint8_t readNextByte(cpu_t *z80) {
+  z80->PC += 1;
+  return readMem(z80, z80->PC);
+}
+
+static inline void incR(cpu_t *z80) {
+  if (z80->R + 1 == 0x80) {
+    z80->R = 0;
+  } else {
+    z80->R++;
+  }
+}
+bool getParity(unsigned int value) {
+  value ^= value >> 4;
+  value ^= value >> 2;
+  value ^= value >> 1;
+  return !(value & 1);
+}
+
+void call(cpu_t *z80, uint16_t addr) {
+  push16(z80, z80->PC + 3);
+  z80->PC = addr;
+}
+void request_NMI(cpu_t *z80) { z80->NMI = true; }
+void request_INT(cpu_t *z80, uint16_t intData) {
+  z80->INT = true;
+  z80->intData = intData;
+}
 void cpuStep(cpu_t *z80) {
   handleInterupts(z80);
   if (!z80->halt) {
     runOpcode(z80, readMem(z80, z80->PC));
   } else {
-    if (readMem(z80, z80->PC + 1) != 0x76) {
-      runOpcode(z80, 0x0);
-    } else {
-      runOpcode(z80, readMem(z80, z80->PC));
-    }
+    runOpcode(z80, 0);
+    z80->PC -= 1;
   }
   z80->numInst += 1;
 }
 
 void handleInterupts(cpu_t *z80) {
-  if (z80->halt && (z80->NMI || z80->MI)) {
+  if (z80->eiDelay == true) {
+    z80->eiDelay -= 1;
+    if (z80->eiDelay == false) {
+      z80->IFF1 = 1;
+      z80->IFF2 = 1;
+    }
+    return;
+  }
+  if (z80->NMI) {
+    z80->IFF2 = z80->IFF1;
+    z80->IFF1 = false;
+    z80->NMI = false;
     z80->halt = false;
+    call(z80, 0x66);
+    incR(z80);
+    return;
+  }
+  if (z80->INT && z80->IFF1) {
+    z80->INT = false;
+    z80->halt = false;
+    switch (z80->IM) {
+    case 0:
+      z80->cycles += 11;
+      runOpcode(z80, z80->intData);
+      break;
+    case 1:
+      z80->cycles += 13;
+      call(z80, 0x38);
+      break;
+    case 2:
+      z80->cycles += 19;
+      call(z80, (z80->I << 8) | z80->intData);
+      break;
+    default:
+      exit(100);
+    }
   }
 }
 
@@ -134,85 +199,30 @@ void z80Init(cpu_t *z80) {
   z80->I = 0;
   z80->R = 0;
 
-  z80->wasLastInstEI = false;
+  z80->eiDelay = false;
   z80->IM = 0;
   z80->IFF1 = false;
   z80->IFF2 = false;
   z80->halt = false;
-  z80->MI = 0;
+  z80->intData = false;
+  z80->INT = 0;
   z80->NMI = 0;
 }
 
-void setFlag(cpu_t *z80, int flag) {
-  z80->F |= flag;
-}
-
-void clearFlag(cpu_t *z80, int flag) {
-  z80->F &= ~(flag);
-}
-
-bool readFlag(cpu_t *z80, int flag) {
-  return z80->F & flag;
-}
-
-uint8_t
-pop(cpu_t *z80) {
-  z80->SP += 1;
-  return readMem(z80, z80->SP - 1);
-}
-
-void push(cpu_t *z80, uint8_t A) {
-  z80->SP -= 1;
-  writeMem(z80, z80->SP, A);
-}
-
-void push16(cpu_t *z80, uint16_t A) {
-  push(z80, A >> 8);
-  push(z80, A & 0xFF);
-}
-
-uint16_t
-pop16(cpu_t *z80) {
-  return pop(z80) | pop(z80) << 8;
-}
-
-static inline uint16_t
-readNN(cpu_t *z80) {
-  z80->PC += 2;
-  return readMem(z80, z80->PC - 1) | readMem(z80, z80->PC) << 8;
-}
-
-static inline uint8_t
-readN(cpu_t *z80) {
-  z80->PC += 1;
-  return readMem(z80, z80->PC);
-}
-
-bool getParity(unsigned int value) {
-  value ^= value >> 4;
-  value ^= value >> 2;
-  value ^= value >> 1;
-  return !(value & 1);
-}
-
-static inline uint16_t
-nnAsPointer(cpu_t *z80) {
-  int valueToRead = readNN(z80);
-  int address =
-      readMem(z80, valueToRead) | readMem(z80, valueToRead + 1) << 8;
+static inline uint16_t nnAsPointer(cpu_t *z80) {
+  int valueToRead = readNextWord(z80);
+  int address = readMem(z80, valueToRead) | readMem(z80, valueToRead + 1) << 8;
   return address;
 }
 
-#define checkSet(flag, condition) \
-  ((z80)->F = ((z80)->F & ~(flag)) | (-!!(condition) & (flag)))
+#define checkSet(flag, condition) ((z80)->F = ((z80)->F & ~(flag)) | (-!!(condition) & (flag)))
 
 void setUndocumentedFlags(cpu_t *z80, int result) {
   checkSet(Z80_F3, result & Z80_F3);
   checkSet(Z80_F5, result & Z80_F5);
 }
 
-static inline void
-add(cpu_t *z80, int A, int B, void *storeLocation, char width, bool carry) {
+static inline void add(cpu_t *z80, int A, int B, void *storeLocation, char width, bool carry) {
   clearFlag(z80, Z80_NF);
   if (width == 'b') {
     uint8_t result = A + B + carry;
@@ -233,8 +243,7 @@ add(cpu_t *z80, int A, int B, void *storeLocation, char width, bool carry) {
   z80->PC += 1;
 }
 
-static inline void
-sub(cpu_t *z80, int A, int B, void *storeLocation, char width, bool carry) {
+static inline void sub(cpu_t *z80, int A, int B, void *storeLocation, char width, bool carry) {
   if (width == 'b') {
     add(z80, A, ~B, storeLocation, 'b', !carry);
     setFlag(z80, Z80_NF);
@@ -242,8 +251,7 @@ sub(cpu_t *z80, int A, int B, void *storeLocation, char width, bool carry) {
     checkSet(Z80_CF, A < B + carry);
   } else if (width == 'w') {
     sub(z80, A & 0xFF, B & 0xFF, &ss1, 'b', carry);
-    sub(z80, (A & 0xFF00) >> 8, (B & 0xFF00) >> 8, &ss2, 'b',
-        readFlag(z80, Z80_CF));
+    sub(z80, (A & 0xFF00) >> 8, (B & 0xFF00) >> 8, &ss2, 'b', readFlag(z80, Z80_CF));
     checkSet(Z80_ZF, *(uint16_t *)storeLocation == 0);
     *(uint16_t *)storeLocation = ss1 | ss2 << 8;
     z80->PC -= 1;
@@ -263,7 +271,7 @@ static inline void and (cpu_t * z80, int A) {
   z80->PC += 1;
 }
 
-static inline void xor (cpu_t * z80, int A) {
+static inline void inst_xor(cpu_t *z80, int A) {
   int result = A ^ z80->A;
   clearFlag(z80, Z80_CF);
   clearFlag(z80, Z80_NF);
@@ -276,8 +284,7 @@ static inline void xor (cpu_t * z80, int A) {
   z80->PC += 1;
 }
 
-        static inline void or
-    (cpu_t * z80, int A) {
+static inline void or (cpu_t * z80, int A) {
   int result = A | z80->A;
   clearFlag(z80, Z80_CF);
   clearFlag(z80, Z80_NF);
@@ -290,15 +297,13 @@ static inline void xor (cpu_t * z80, int A) {
   z80->PC += 1;
 }
 
-static inline void
-cp(cpu_t *z80, int A) {
+static inline void cp(cpu_t *z80, int A) {
   uint8_t trash;
   sub(z80, z80->A, A, &trash, 'b', false);
   setUndocumentedFlags(z80, A);
 }
 
-static inline void
-rotateC(cpu_t *z80, char direction, void *val) {
+static inline void rotateC(cpu_t *z80, char direction, void *val) {
   int result = 0;
   clearFlag(z80, Z80_HF);
   clearFlag(z80, Z80_NF);
@@ -317,8 +322,7 @@ rotateC(cpu_t *z80, char direction, void *val) {
   z80->PC += 1;
 }
 
-static inline void
-rc_a(cpu_t *z80, char direction) {
+static inline void rc_a(cpu_t *z80, char direction) {
   uint8_t *val = &z80->A;
   int result = 0;
   clearFlag(z80, Z80_HF);
@@ -335,8 +339,7 @@ rc_a(cpu_t *z80, char direction) {
   z80->PC += 1;
 }
 
-static inline void
-rotate(cpu_t *z80, char direction, void *val) {
+static inline void rotate(cpu_t *z80, char direction, void *val) {
   int result = 0;
   clearFlag(z80, Z80_HF);
   clearFlag(z80, Z80_NF);
@@ -356,8 +359,7 @@ rotate(cpu_t *z80, char direction, void *val) {
   z80->PC += 1;
 }
 
-static inline void
-r_a(cpu_t *z80, char direction) {
+static inline void r_a(cpu_t *z80, char direction) {
   uint8_t *val = &z80->A;
   int result = 0;
   clearFlag(z80, Z80_HF);
@@ -375,8 +377,7 @@ r_a(cpu_t *z80, char direction) {
   z80->PC += 1;
 }
 
-static inline void
-shift(cpu_t *z80, char direction, void *val) {
+static inline void shift(cpu_t *z80, char direction, void *val) {
   int result = 0;
   clearFlag(z80, Z80_HF);
   clearFlag(z80, Z80_NF);
@@ -397,8 +398,7 @@ shift(cpu_t *z80, char direction, void *val) {
   z80->PC += 1;
 }
 
-static inline void
-logicalShift(cpu_t *z80, char direction, void *val) {
+static inline void logicalShift(cpu_t *z80, char direction, void *val) {
   int result = 0;
   clearFlag(z80, Z80_HF);
   clearFlag(z80, Z80_NF);
@@ -420,8 +420,7 @@ logicalShift(cpu_t *z80, char direction, void *val) {
   z80->PC += 1;
 }
 
-static inline void
-bit(cpu_t *z80, int pos, uint8_t *ss2) {
+static inline void bit(cpu_t *z80, int pos, uint8_t *ss2) {
   uint8_t value = *ss2;
   int result = value & (1 << (pos));
   clearFlag(z80, Z80_NF);
@@ -434,20 +433,17 @@ bit(cpu_t *z80, int pos, uint8_t *ss2) {
   z80->PC += 1;
 }
 
-static inline void
-set(cpu_t *z80, int pos, uint8_t *ss2) {
+static inline void set(cpu_t *z80, int pos, uint8_t *ss2) {
   *ss2 |= (1 << pos);
   z80->PC += 1;
 }
 
-static inline void
-reset(cpu_t *z80, int pos, uint8_t *ss2) {
+static inline void reset(cpu_t *z80, int pos, uint8_t *ss2) {
   *ss2 &= ~(1 << pos);
   z80->PC += 1;
 }
 
-static inline void
-exchangeRegisters(cpu_t *z80, uint16_t *A, uint16_t *B) {
+static inline void exchangeRegisters(cpu_t *z80, uint16_t *A, uint16_t *B) {
   uint16_t ss1;
   ss1 = *B;
   *B = *A;
@@ -526,49 +522,32 @@ void write16(cpu_t *z80, uint16_t addr, uint16_t data) {
   writeMem(z80, addr + 1, (data & 0xFF00) >> 8);
 }
 
-static inline void
-inc8(cpu_t *z80, void *value) {
+static inline void inc8(cpu_t *z80, void *value) {
   bool oldCarry = readFlag(z80, Z80_CF);
   add(z80, *(uint8_t *)value, 0, value, 'b', true);
   checkSet(Z80_CF, oldCarry);
 }
 
-static inline void
-inc16(cpu_t *z80, uint16_t *value) {
+static inline void inc16(cpu_t *z80, uint16_t *value) {
   *value += 1;
   z80->PC += 1;
 }
 
-static inline void
-incR(cpu_t *z80) {
-  if (z80->R + 1 == 0x80) {
-    z80->R = 0;
-  } else {
-    z80->R++;
-  }
-}
-
-static inline void
-dec8(cpu_t *z80, void *value) {
+static inline void dec8(cpu_t *z80, void *value) {
   bool oldCarry = readFlag(z80, Z80_CF);
   sub(z80, *(uint8_t *)value, 0, value, 'b', true);
   checkSet(Z80_CF, oldCarry);
 }
 
-static inline void
-dec16(cpu_t *z80, uint16_t *value) {
+static inline void dec16(cpu_t *z80, uint16_t *value) {
   *value -= 1;
   z80->PC += 1;
 }
 
-void call(cpu_t *z80, uint16_t addr) {
-  push16(z80, addr);
-  z80->PC = readNN(z80);
-}
-
 void cond_call(cpu_t *z80, bool cond) {
+  int addr = readMem(z80, z80->PC + 1) | readMem(z80, z80->PC + 2) << 8;
   if (cond) {
-    call(z80, z80->PC + 3);
+    call(z80, addr);
     z80->cycles += 7;
   } else {
     z80->PC += 3;
@@ -580,9 +559,7 @@ void rst(cpu_t *z80, int resetVector) {
   z80->PC = resetVector;
 }
 
-void ret(cpu_t *z80) {
-  z80->PC = pop(z80) | pop(z80) << 8;
-}
+void ret(cpu_t *z80) { z80->PC = pop(z80) | pop(z80) << 8; }
 
 void cond_ret(cpu_t *z80, bool cond) {
   if (cond) {
@@ -595,7 +572,7 @@ void cond_ret(cpu_t *z80, bool cond) {
 
 void jp(cpu_t *z80, bool input) {
   if (input) {
-    z80->PC = readNN(z80);
+    z80->PC = readNextWord(z80);
   } else {
     z80->PC += 3;
   }
@@ -619,24 +596,17 @@ void ini(cpu_t *z80) {
   checkSet(Z80_PF, getParity(((ss2 + ((z80->C + 1) & 255)) & 7) ^ z80->B));
 }
 
-static inline void
-postINI_OUTI_R(cpu_t *z80, uint8_t data) {
+static inline void postINI_OUTI_R(cpu_t *z80, uint8_t data) {
   // I guess this is right, source
   // https://github.com/hoglet67/Z80Decoder/wiki/Undocumented-Flags
   checkSet(Z80_F5, ((z80->PC - 2) >> 11) & 1);
   checkSet(Z80_F3, ((z80->PC - 2) >> 13) & 1);
   if (readFlag(z80, Z80_CF)) {
     if (data & 0x80) {
-      checkSet(Z80_PF,
-          readFlag(z80,
-              Z80_PF) ^
-              getParity((z80->B - 1) & 7) ^ 1);
+      checkSet(Z80_PF, readFlag(z80, Z80_PF) ^ getParity((z80->B - 1) & 7) ^ 1);
       checkSet(Z80_HF, (z80->B & 0x0F) == 0);
     } else {
-      checkSet(Z80_PF,
-          readFlag(z80,
-              Z80_PF) ^
-              getParity((z80->B + 1) & 7) ^ 1);
+      checkSet(Z80_PF, readFlag(z80, Z80_PF) ^ getParity((z80->B + 1) & 7) ^ 1);
       checkSet(Z80_HF, (z80->B & 0x0F) == 0x0F);
     }
   } else {
@@ -684,7 +654,7 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
     z80->PC += 1;
     break;
   case 0x01:
-    LD(z80->BC, readNN(z80));
+    LD(z80->BC, readNextWord(z80));
     break;
   case 0x02:
     writeMem(z80, z80->BC, z80->A);
@@ -700,7 +670,7 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
     dec8(z80, &z80->B);
     break;
   case 0x06:
-    LD(z80->B, readN(z80));
+    LD(z80->B, readNextByte(z80));
     break;
   case 0x07:
     rc_a(z80, 'l');
@@ -724,7 +694,7 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
     dec8(z80, &z80->C);
     break;
   case 0x0E:
-    LD(z80->C, readN(z80));
+    LD(z80->C, readNextByte(z80));
     break;
   case 0x0F:
     rc_a(z80, 'r');
@@ -733,7 +703,7 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
     dnjz(z80);
     break;
   case 0x11:
-    LD(z80->DE, readNN(z80));
+    LD(z80->DE, readNextWord(z80));
     break;
   case 0x12:
     writeMem(z80, z80->DE, z80->A);
@@ -749,13 +719,13 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
     dec8(z80, &z80->D);
     break;
   case 0x16:
-    LD(z80->D, readN(z80));
+    LD(z80->D, readNextByte(z80));
     break;
   case 0x17:
     r_a(z80, 'l');
     break;
   case 0x18:
-    z80->PC += (int8_t)readN(z80) + 1;
+    z80->PC += (int8_t)readNextByte(z80) + 1;
     break;
   case 0x19:
     add(z80, z80->DE, z80->HL, &z80->HL, 'w', false);
@@ -773,7 +743,7 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
     dec8(z80, &z80->E);
     break;
   case 0x1E:
-    LD(z80->E, readN(z80));
+    LD(z80->E, readNextByte(z80));
     break;
   case 0x1F:
     r_a(z80, 'r');
@@ -782,10 +752,10 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
     jr(z80, !readFlag(z80, Z80_ZF));
     break;
   case 0x21:
-    LD(z80->HL, readNN(z80));
+    LD(z80->HL, readNextWord(z80));
     break;
   case 0x22:
-    write16(z80, readNN(z80), z80->HL);
+    write16(z80, readNextWord(z80), z80->HL);
     break;
   case 0x23:
     inc16(z80, &z80->HL);
@@ -797,7 +767,7 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
     dec8(z80, &z80->H);
     break;
   case 0x26:
-    LD(z80->H, readN(z80));
+    LD(z80->H, readNextByte(z80));
     break;
   case 0x27:
     DAA_inst(z80);
@@ -821,7 +791,7 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
     dec8(z80, &z80->L);
     break;
   case 0x2E:
-    LD(z80->L, readN(z80));
+    LD(z80->L, readNextByte(z80));
     break;
   case 0x2F:
     cpl(z80);
@@ -830,10 +800,10 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
     jr(z80, !readFlag(z80, Z80_CF));
     break;
   case 0x31:
-    LD(z80->SP, readNN(z80));
+    LD(z80->SP, readNextWord(z80));
     break;
   case 0x32:
-    writeMem(z80, readNN(z80), z80->A);
+    writeMem(z80, readNextWord(z80), z80->A);
     z80->PC += 1;
     break;
   case 0x33:
@@ -846,7 +816,7 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
     HLASINDEX(dec8(z80, &z80->HL));
     break;
   case 0x36:
-    HLASINDEX(LD(z80->HL, readN(z80)));
+    HLASINDEX(LD(z80->HL, readNextByte(z80)));
     break;
   case 0x37:
     scf(z80);
@@ -870,7 +840,7 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
     dec8(z80, &z80->A);
     break;
   case 0x3E:
-    LD(z80->A, readN(z80));
+    LD(z80->A, readNextByte(z80));
     break;
   case 0x3F:
     ccf(z80);
@@ -1131,8 +1101,7 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
     add(z80, z80->A, z80->L, &z80->A, 'b', readFlag(z80, Z80_CF));
     break;
   case 0x8E:
-    HLASINDEX(add(z80, z80->A, z80->HL, &z80->A, 'b',
-        readFlag(z80, Z80_CF)));
+    HLASINDEX(add(z80, z80->A, z80->HL, &z80->A, 'b', readFlag(z80, Z80_CF)));
     break;
   case 0x8F:
     add(z80, z80->A, z80->A, &z80->A, 'b', readFlag(z80, Z80_CF));
@@ -1180,8 +1149,7 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
     sub(z80, z80->A, z80->L, &z80->A, 'b', readFlag(z80, Z80_CF));
     break;
   case 0x9E:
-    HLASINDEX(sub(z80, z80->A, z80->HL, &z80->A, 'b',
-        readFlag(z80, Z80_CF)));
+    HLASINDEX(sub(z80, z80->A, z80->HL, &z80->A, 'b', readFlag(z80, Z80_CF)));
     break;
   case 0x9F:
     sub(z80, z80->A, z80->A, &z80->A, 'b', readFlag(z80, Z80_CF));
@@ -1211,28 +1179,28 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
     and(z80, z80->A);
     break;
   case 0xA8:
-    xor(z80, z80->B);
+    inst_xor(z80, z80->B);
     break;
   case 0xA9:
-    xor(z80, z80->C);
+    inst_xor(z80, z80->C);
     break;
   case 0xAA:
-    xor(z80, z80->D);
+    inst_xor(z80, z80->D);
     break;
   case 0xAB:
-    xor(z80, z80->E);
+    inst_xor(z80, z80->E);
     break;
   case 0xAC:
-    xor(z80, z80->H);
+    inst_xor(z80, z80->H);
     break;
   case 0xAD:
-    xor(z80, z80->L);
+    inst_xor(z80, z80->L);
     break;
   case 0xAE:
-    HLASINDEX(xor(z80, z80->HL));
+    HLASINDEX(inst_xor(z80, z80->HL));
     break;
   case 0xAF:
-    xor(z80, z80->A);
+    inst_xor(z80, z80->A);
     break;
   case 0xB0:
     or (z80, z80->B);
@@ -1303,7 +1271,7 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
     z80->PC += 1;
     break;
   case 0xC6:
-    add(z80, z80->A, readN(z80), &z80->A, 'b', false);
+    add(z80, z80->A, readNextByte(z80), &z80->A, 'b', false);
     break;
   case 0xC7:
     rst(z80, 0x0);
@@ -1326,10 +1294,10 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
     cond_call(z80, readFlag(z80, Z80_ZF));
     break;
   case 0xCD:
-    call(z80, z80->PC + 3);
+    call(z80, readMem(z80, z80->PC + 1) | readMem(z80, z80->PC + 2) << 8);
     break;
   case 0xCE:
-    add(z80, z80->A, readN(z80), &z80->A, 'b', readFlag(z80, Z80_CF));
+    add(z80, z80->A, readNextByte(z80), &z80->A, 'b', readFlag(z80, Z80_CF));
     break;
   case 0xCF:
     rst(z80, 0x08);
@@ -1345,7 +1313,7 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
     jp(z80, !readFlag(z80, Z80_CF));
     break;
   case 0xD3:
-    out(z80, z80->A << 8 | readN(z80), z80->A);
+    out(z80, z80->A << 8 | readNextByte(z80), z80->A);
     break;
   case 0xD4:
     cond_call(z80, !readFlag(z80, Z80_CF));
@@ -1355,7 +1323,7 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
     z80->PC += 1;
     break;
   case 0xD6:
-    sub(z80, z80->A, readN(z80), &z80->A, 'b', false);
+    sub(z80, z80->A, readNextByte(z80), &z80->A, 'b', false);
     break;
   case 0xD7:
     rst(z80, 0x10);
@@ -1377,7 +1345,7 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
     jp(z80, readFlag(z80, Z80_CF));
     break;
   case 0xDB:
-    z80->A = in(z80, (z80->A << 8 | readN(z80)));
+    z80->A = in(z80, (z80->A << 8 | readNextByte(z80)));
     break;
   case 0xDC:
     cond_call(z80, readFlag(z80, Z80_CF));
@@ -1390,7 +1358,7 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
     z80->HL = hlStorage;
     break;
   case 0xDE:
-    sub(z80, z80->A, readN(z80), &z80->A, 'b', readFlag(z80, Z80_CF));
+    sub(z80, z80->A, readNextByte(z80), &z80->A, 'b', readFlag(z80, Z80_CF));
     break;
   case 0xDF:
     rst(z80, 0x18);
@@ -1419,7 +1387,7 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
     z80->PC += 1;
     break;
   case 0xE6:
-    and(z80, readN(z80));
+    and(z80, readNextByte(z80));
     break;
   case 0xE7:
     rst(z80, 0x20);
@@ -1448,7 +1416,7 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
     miscInstructions(z80, readMem(z80, z80->PC));
     break;
   case 0xEE:
-    xor(z80, readN(z80));
+    inst_xor(z80, readNextByte(z80));
     break;
   case 0xEF:
     rst(z80, 0x28);
@@ -1476,7 +1444,7 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
     z80->PC += 1;
     break;
   case 0xF6:
-    or (z80, readN(z80));
+    or (z80, readNextByte(z80));
     break;
   case 0xF7:
     rst(z80, 0x30);
@@ -1493,6 +1461,7 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
   case 0xFB:
     z80->IFF1 = true;
     z80->IFF2 = true;
+    z80->eiDelay = true;
     z80->PC += 1;
     break;
   case 0xFC:
@@ -1506,7 +1475,7 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
     z80->HL = hlStorage;
     break;
   case 0xFE:
-    cp(z80, readN(z80));
+    cp(z80, readNextByte(z80));
     break;
   case 0xFF:
     rst(z80, 0x38);
@@ -1524,13 +1493,10 @@ void bitInstructions(cpu_t *z80, uint8_t opcode) {
     memAtHL = readMem(z80, var);
   }
   incR(z80);
-  uint8_t *registers[8] =
-      {&z80->B, &z80->C, &z80->D, &z80->E, &z80->H, &z80->L, &memAtHL,
-          &z80->A};
-  void (*shiftFunctions[4])(cpu_t *z80, char direction, void *val) =
-      {rotateC, rotate, shift, logicalShift};
-  void (*bitFunctions[3])(cpu_t *z80, int pos, uint8_t *ss2) =
-      {bit, reset, set};
+  uint8_t *registers[8] = {&z80->B, &z80->C, &z80->D, &z80->E, &z80->H, &z80->L, &memAtHL, &z80->A};
+  void (*shiftFunctions[4])(cpu_t *z80, char direction, void *val) = {
+      rotateC, rotate, shift, logicalShift};
+  void (*bitFunctions[3])(cpu_t *z80, int pos, uint8_t *ss2) = {bit, reset, set};
   if (opcode < 0x40) {
     if ((opcode & 0xF) > 0x7) {
       shiftFunctions[opcode / 16](z80, 'r', registers[opcode % 8]);
@@ -1538,15 +1504,15 @@ void bitInstructions(cpu_t *z80, uint8_t opcode) {
       shiftFunctions[opcode / 16](z80, 'l', registers[opcode % 8]);
     }
   } else {
-    bitFunctions[(opcode - 0x40) / 64](z80, ((opcode - 0x40) % 64) / 8,
-        registers[opcode % 8]);
+    bitFunctions[(opcode - 0x40) / 64](z80, ((opcode - 0x40) % 64) / 8, registers[opcode % 8]);
     if (((opcode & 7) == 6) && (opcode - 0x40) / 64 == 0) {
       z80->cycles += 4;
     }
   }
   writeMem(z80, var, memAtHL);
 
-  if ((((opcode >> 6) & 3) == 0 || ((opcode >> 6) & 3) == 2 || ((opcode >> 6) & 3) == 3) && ((opcode & 7) == 6)) {
+  if ((((opcode >> 6) & 3) == 0 || ((opcode >> 6) & 3) == 2 || ((opcode >> 6) & 3) == 3) &&
+      ((opcode & 7) == 6)) {
     z80->cycles += 7;
   }
 }
@@ -1571,7 +1537,7 @@ void miscInstructions(cpu_t *z80, uint8_t opcode) {
     sbcHL(z80, z80->BC);
     break;
   case 0x43:
-    ss1 = readNN(z80);
+    ss1 = readNextWord(z80);
     writeMem(z80, ss1, z80->C);
     writeMem(z80, ss1 + 1, z80->B);
     z80->PC += 1;
@@ -1638,7 +1604,7 @@ void miscInstructions(cpu_t *z80, uint8_t opcode) {
     sbcHL(z80, z80->DE);
     break;
   case 0x53:
-    ss1 = readNN(z80);
+    ss1 = readNextWord(z80);
     writeMem(z80, ss1, z80->E);
     writeMem(z80, ss1 + 1, z80->D);
     z80->PC += 1;
@@ -1717,7 +1683,7 @@ void miscInstructions(cpu_t *z80, uint8_t opcode) {
     sbcHL(z80, z80->HL);
     break;
   case 0x63:
-    ss1 = readNN(z80);
+    ss1 = readNextWord(z80);
     writeMem(z80, ss1, z80->L);
     writeMem(z80, ss1 + 1, z80->H);
     z80->PC += 1;
@@ -1801,7 +1767,7 @@ void miscInstructions(cpu_t *z80, uint8_t opcode) {
     sbcHL(z80, z80->SP);
     break;
   case 0x73:
-    write16(z80, readNN(z80), z80->SP);
+    write16(z80, readNextWord(z80), z80->SP);
     break;
   case 0x74:
     sub(z80, 0, z80->A, &z80->A, 'b', false);
@@ -1941,8 +1907,7 @@ void miscInstructions(cpu_t *z80, uint8_t opcode) {
     z80->HL--;
     checkSet(Z80_NF, ss2 >> 7);
     checkSet(Z80_HF | Z80_CF, (ss2 + ((z80->C - 1) & 255) > 255));
-    checkSet(Z80_PF,
-        getParity(((ss2 + ((z80->C - 1) & 255)) & 7) ^ z80->B));
+    checkSet(Z80_PF, getParity(((ss2 + ((z80->C - 1) & 255)) & 7) ^ z80->B));
     break;
   case 0xBA:
     // INDR
@@ -1953,8 +1918,7 @@ void miscInstructions(cpu_t *z80, uint8_t opcode) {
     z80->HL--;
     checkSet(Z80_NF, ss2 >> 7);
     checkSet(Z80_HF | Z80_CF, (ss2 + ((z80->C - 1) & 255) > 255));
-    checkSet(Z80_PF,
-        getParity(((ss2 + ((z80->C - 1) & 255)) & 7) ^ z80->B));
+    checkSet(Z80_PF, getParity(((ss2 + ((z80->C - 1) & 255)) & 7) ^ z80->B));
     if (z80->B != 0) {
       z80->PC -= 2;
       z80->cycles += 5;
@@ -2028,8 +1992,7 @@ void prefixInst(cpu_t *z80, uint8_t opcode) {
     z80->cycles += 23;
     opcode = readMem(z80, z80->PC + 2);
     ss1 = z80->HL + (int8_t)displacement;
-    if (opcode >= 0x40 &&
-        opcode <= 0x7F) {
+    if (opcode >= 0x40 && opcode <= 0x7F) {
       uint8_t temp = readMem(z80, ss1);
       incR(z80);
       bit(z80, (opcode - 0x40) / 8, &temp);

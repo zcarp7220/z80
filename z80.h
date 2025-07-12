@@ -77,17 +77,17 @@ typedef struct cpu {
   uint16_t IY;
   uint16_t I;
   uint16_t R;
-  bool EI;
   uint8_t IM;
   bool IFF1;
   bool IFF2;
-  bool wasLastInstEI;
-  bool MI;
+  bool eiDelay;
+  bool INT;
   bool NMI;
   bool halt;
   long cycles;
   long numInst;
   void *userdata;
+  uint16_t intData;
   // Functions
   uint8_t (*readByte)(struct cpu *, uint16_t);
   void (*writeByte)(struct cpu *, uint16_t, uint8_t);
@@ -103,4 +103,4 @@ void prefixInst(cpu_t *z80, uint8_t opcode);
 void z80Init(cpu_t *z80);
 void cpuStep(cpu_t *z80);
 void request_NMI(cpu_t *z80);
-void request_INT(cpu_t *z80);
+void request_INT(cpu_t *z80, uint16_t intData);
