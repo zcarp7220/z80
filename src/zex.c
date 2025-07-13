@@ -12,14 +12,10 @@ void zexInit(uint8_t *buffer, size_t size) {
     zexRam[0x100 + i] = buffer[i];
   }
 }
-void memWrite(cpu_t *unused, uint16_t addr, uint8_t data) {
-  zexRam[addr] = data;
-}
+void memWrite(cpu_t *unused, uint16_t addr, uint8_t data) { zexRam[addr] = data; }
 
-uint8_t memRead(cpu_t *unused, uint16_t addr) {
-  return zexRam[addr];
-}
-void out(cpu_t *z80, uint16_t addr, uint8_t data) {
+uint8_t memRead(cpu_t *unused, uint16_t addr) { return zexRam[addr]; }
+void out(cpu_t *z80, uint8_t addr, uint8_t data) {
   printf("\nNumber of Instructions: %ld, Number of Cycles: %ld", z80->numInst, z80->cycles);
   testFinished = true;
 }
@@ -44,14 +40,12 @@ void zexStep() {
   z80.out = out;
   z80.in = in;
   z80.PC = 0x100;
-   while (!testFinished) {
+  while (!testFinished) {
     // fprintf(stderr, "PC:%X A:%02X F:%02X  B:%02X C:%02X  D:%02X E:%02X  H:%02X L:%02X P:%02X\n",
     //        z80.PC, z80.A, z80.F,
     //         z80.B, z80.C,
     //         z80.D, z80.E,
     //         z80.H, z80.L, z80.SP);
     cpuStep(&z80);
-
-
   }
 }
