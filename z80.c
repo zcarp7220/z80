@@ -165,7 +165,8 @@ void handleInterupts(cpu_t *z80) {
       break;
     case 2:
       z80->cycles += 19;
-      call(z80, (z80->I << 8) | z80->intData);
+      call(z80, readMem(z80, ((z80->I) | z80->intData) + 1) << 8 |
+                    readMem(z80, ((z80->I) | z80->intData)));
       break;
     default:
       exit(100);
