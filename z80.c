@@ -142,18 +142,11 @@ void handleInterupts(cpu_t *z80) {
     }
     return;
   }
-  if (z80->NMI) {
-    z80->IFF2 = z80->IFF1;
-    z80->IFF1 = false;
-    z80->NMI = false;
-    z80->halt = false;
-    call(z80, 0x66);
-    incR(z80);
-    return;
-  }
+
   if (z80->INT && z80->IFF1) {
     z80->INT = false;
     z80->halt = false;
+    z80->IFF1 = z80->IFF2 = false;
     switch (z80->IM) {
     case 0:
       z80->cycles += 11;
@@ -165,13 +158,22 @@ void handleInterupts(cpu_t *z80) {
       break;
     case 2:
       z80->cycles += 19;
-      call(z80, readMem(z80, (z80->I << 8) | z80->intData) |
-                    (readMem(z80, ((z80->I << 8) | z80->intData) + 1) << 8));
+      call(z80, (z80->I << 8 | z80->intData));
 
       break;
     default:
       exit(100);
     }
+  }
+
+  if (z80->NMI) {
+    z80->IFF2 = z80->IFF1;
+    z80->IFF1 = false;
+    z80->NMI = false;
+    z80->halt = false;
+    call(z80, 0x66);
+    incR(z80);
+    return;
   }
 }
 
@@ -262,7 +264,7 @@ static inline void sub(cpu_t *z80, int A, int B, void *storeLocation, char width
   }
 }
 
-static inline void and (cpu_t * z80, int A) {
+static inline void and(cpu_t *z80, int A) {
   int result = A & z80->A;
   clearFlag(z80, Z80_CF);
   clearFlag(z80, Z80_NF);
@@ -288,7 +290,7 @@ static inline void inst_xor(cpu_t *z80, int A) {
   z80->PC += 1;
 }
 
-static inline void or (cpu_t * z80, int A) {
+static inline void or(cpu_t *z80, int A) {
   int result = A | z80->A;
   clearFlag(z80, Z80_CF);
   clearFlag(z80, Z80_NF);
@@ -1207,28 +1209,28 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
     inst_xor(z80, z80->A);
     break;
   case 0xB0:
-    or (z80, z80->B);
+    or(z80, z80->B);
     break;
   case 0xB1:
-    or (z80, z80->C);
+    or(z80, z80->C);
     break;
   case 0xB2:
-    or (z80, z80->D);
+    or(z80, z80->D);
     break;
   case 0xB3:
-    or (z80, z80->E);
+    or(z80, z80->E);
     break;
   case 0xB4:
-    or (z80, z80->H);
+    or(z80, z80->H);
     break;
   case 0xB5:
-    or (z80, z80->L);
+    or(z80, z80->L);
     break;
   case 0xB6:
-    HLASINDEX(or (z80, z80->HL));
+    HLASINDEX(or(z80, z80->HL));
     break;
   case 0xB7:
-    or (z80, z80->A);
+    or(z80, z80->A);
     break;
   case 0xB8:
     cp(z80, z80->B);
@@ -1448,7 +1450,7 @@ void runOpcode(cpu_t *z80, uint8_t opcode) {
     z80->PC += 1;
     break;
   case 0xF6:
-    or (z80, readNextByte(z80));
+    or(z80, readNextByte(z80));
     break;
   case 0xF7:
     rst(z80, 0x30);
